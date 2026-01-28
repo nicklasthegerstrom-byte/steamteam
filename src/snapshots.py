@@ -10,6 +10,15 @@ class Snapshot:
     game_vector: dict[int, float]
     genre_vector: dict[str, float]
 
+    #Funktion för att spara snapshot till en dict
+    def to_dict(self) -> dict:
+        return {
+            "user_id": self.user_id,
+            "created_at": self.created_at.isoformat(),
+            "game_vector": self.game_vector,
+            "genre_vector": self.genre_vector,
+        }
+
     #__str__ För att kunna printa snapshotten snyggt om man vill
     def __str__(self) -> str:
         lines = [
