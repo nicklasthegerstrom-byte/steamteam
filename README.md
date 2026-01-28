@@ -1,3 +1,5 @@
+![SteamTeam](steamteam.jpg)
+
 # Steamteam
 Match with other users based on gaming interests.
 
