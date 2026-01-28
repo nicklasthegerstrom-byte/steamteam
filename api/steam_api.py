@@ -1,20 +1,18 @@
-from dotenv import load_dotenv
 from urllib.parse import urlparse
-from pathlib import Path
 import os
 import requests
 import json
 import random
 import string
 
-__all__ = ["get_enriched_user_games"]
+from data.settings import env_load
 
-# ------------------ Load environment ------------------
+__all__ = ["get_user_top_games", "get_fake_user_top_games"]
 
-env_path = Path(__file__).resolve().parent.parent / ".env"
-load_dotenv(dotenv_path=env_path)
+# ------------------ Load Steam API key ------------------
 
 STEAM_API_KEY = os.getenv("STEAM_API_KEY")
+
 if not STEAM_API_KEY:
     print("Warning: STEAM_API_KEY not found. Only mock functions will work.")
 
@@ -23,6 +21,10 @@ if not STEAM_API_KEY:
 
 def _fetch_user_games(steam_id):
     """Fetch all owned games for a user from Steam Web API."""
+    
+    if not STEAM_API_KEY:
+        raise RuntimeError("STEAM_API_KEY is required for real Steam API calls")
+    
     url = "https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/"
     params = {
         "key": STEAM_API_KEY,
@@ -45,6 +47,7 @@ def _fetch_user_games(steam_id):
 
 def _fetch_store_metadata(appid, cc="us", lang="english"):
     """Fetch genres and categories from Steam Storefront API."""
+    
     url = "https://store.steampowered.com/api/appdetails"
     params = {"appids": appid, "cc": cc, "l": lang}
 
@@ -68,6 +71,7 @@ def _fetch_store_metadata(appid, cc="us", lang="english"):
 
 def _enrich_games(games, limit):
     """Sort games by playtime_forever and enrich with store metadata."""
+    
     games = sorted(games, key=lambda g: g.get("playtime_forever", 0), reverse=True)[:limit]
 
     enriched = []
@@ -92,6 +96,10 @@ def _resolve_steam_id(value):
     - Vanity name
     - Full Steam profile URL (/profiles/ or /id/)
     """
+    
+    if not STEAM_API_KEY:
+        raise RuntimeError("STEAM_API_KEY is required for real Steam API calls")
+    
     value = value.strip()
 
     # Full URL
@@ -115,7 +123,7 @@ def _resolve_steam_id(value):
         return value
 
     # Raw vanity name
-    elif value.isalnum():
+    elif "".join(c for c in value if c not in "-_").isalnum():
         vanity = value
 
     else:
@@ -158,6 +166,7 @@ def get_user_top_games(user_string, top_n=5):
             "games": [enriched game dicts]
         }
     """
+    
     steam_id = _resolve_steam_id(user_string)
     games = _fetch_user_games(steam_id)
     enriched_games = _enrich_games(games, top_n)
@@ -179,6 +188,7 @@ def get_fake_user_top_games(user_string, top_n=5):
     Returns:
         dict: Mock Steam user game data
     """
+    
     result = {
         "steam_id": ''.join(str(random.randint(0, 9)) for _ in range(17)),
         "game_count": top_n,
