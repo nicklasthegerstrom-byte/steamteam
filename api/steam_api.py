@@ -5,13 +5,13 @@ import json
 import random
 import string
 
-from data.settings import env_load
+from data.settings import SETTINGS
 
 __all__ = ["get_user_top_games", "get_fake_user_top_games"]
 
 # ------------------ Load Steam API key ------------------
 
-STEAM_API_KEY = os.getenv("STEAM_API_KEY")
+STEAM_API_KEY = SETTINGS.steam_api_key
 
 if not STEAM_API_KEY:
     print("Warning: STEAM_API_KEY not found. Only mock functions will work.")
