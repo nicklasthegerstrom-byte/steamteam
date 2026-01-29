@@ -1,5 +1,3 @@
-# services/profile_sync.py
-
 from datetime import datetime
 from api.steam_webapi import resolve_steam_id, fetch_owned_games
 from api.steam_store import fetch_store_metadata
@@ -32,57 +30,46 @@ def enrich_games(games: list[dict], top_n: int = 5) -> list[dict]:
 
 # ------------------ Public function ------------------
 
-def sync_user_profile(user_string: str, top_n: int = 5, user_id: int = None) -> dict:
+def sync_user_profile(user_string: str, top_n: int = 5, user_id: int = None) -> Snapshot:
     """
     Full profile sync:
     1. Resolve SteamID
     2. Fetch owned games
     3. Enrich games with store metadata
-    4. Build snapshot (vector) via Nicklas logic
-    5. Return both raw_profile and vector snapshot
+    4. Create snapshot
+    5. Return snapshot
 
     Parameters:
         user_string (str): SteamID64 / vanity / profile URL
         top_n (int): number of top games to include
-        user_id (int, optional): internal ID for Snapshot creation
-
+        user_id (int): internal ID for Snapshot creation
+        
     Returns:
-        dict: {
-            "steam_id": str,
-            "raw_profile": { "games": [...], "game_count": int },
-            "vector": Snapshot object
-        }
+        Snapshot:
+            A Snapshot object containing:
+                - user_id       -> Linked to SteamTeam account
+                - created_at    -> timestamp of when the snapshot was created
+                - game_vector   -> weighted representation of games
+                - genre_vector  -> weighted representation of genres
     """
+
     # resolve SteamID
     steam_id = resolve_steam_id(user_string)
 
     # fetch owned games
     games = fetch_owned_games(steam_id)
 
-    # enrich med store metadata
+    # enrich with store metadata
     enriched_games = enrich_games(games, top_n)
 
     # create snapshot with vectors
     extracted = extract_games({"games": enriched_games})
-    snapshot_user_id = user_id if user_id is not None else int(steam_id[-6:])  # fallback
+    snapshot_user_id = user_id
+    if not snapshot_user_id:
+        raise ValueError("user_id must be provided to create a Snapshot")
+
     snapshot: Snapshot = create_snapshot(snapshot_user_id, extracted)
 
-    # return profile dict
-    return {
-        "steam_id": steam_id,
-        "created": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "raw_profile": {
-            "games": enriched_games,
-            "game_count": len(enriched_games)
-        },
-        "vector": snapshot
-    }
+    # return snapshot
+    return snapshot
 
-# ------------------ Example CLI ------------------
-
-if __name__ == "__main__":
-    user_input = input("Enter SteamID, vanity, or profile URL: ")
-    result = sync_user_profile(user_input, top_n=5)
-    print("Steam ID:", result["steam_id"])
-    print("Raw games:", result["raw_profile"])
-    print("Vector snapshot:\n", result["vector"])
