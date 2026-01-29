@@ -1,5 +1,3 @@
-# api/steam_store.py
-
 import requests
 
 __all__ = ["fetch_store_metadata"]
