@@ -5,6 +5,11 @@ from pathlib import Path
 from typing import Final, Optional
 import os
 
+from dotenv import load_dotenv
+
+# Load .env from project root into env variables
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
 # Helper to read env vars with optional default
 def _env(name: str, default: Optional[str] = None) -> Optional[str]:
     v = os.getenv(name)
