@@ -22,7 +22,7 @@ def enrich_games(games: list[dict], top_n: int = 5) -> list[dict]:
             "appid": g["appid"],
             "name": g.get("name"),
             "playtime_forever": g.get("playtime_forever", 0),
-            "playtime_2weeks": g.get("playtime_2weeks"),
+            "playtime_2weeks": g.get("playtime_2weeks", 0),
             "genres": genres,
             "categories": categories,
         })
