@@ -60,6 +60,6 @@ def test_fetch_store_metadata_request_exception(monkeypatch):
     monkeypatch.setattr(steam_store.requests, "get", fake_get)
 
     genres, categories = steam_store.fetch_store_metadata(123)
-    # Fail-soft → tomma listor
+    # Fail-soft return empty lists
     assert genres == []
     assert categories == []
