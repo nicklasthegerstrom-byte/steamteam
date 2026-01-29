@@ -181,7 +181,7 @@ It is loaded automatically when data/settings.py is imported into the applicatio
 
 Required environment variable:
 
-- steam_api_key=your_steam_api_key_here
+- STEAM_API_KEY=your_steam_api_key_here
 
 If the Steam API key is missing or invalid, only mock data functions will work.
 
