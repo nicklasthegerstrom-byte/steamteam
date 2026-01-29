@@ -205,11 +205,8 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
-<<<<<<< HEAD
-
-
-#Demo files
-data/demo/
-=======
 .env
->>>>>>> dev
+
+
+#demo data
+data/demo/
