@@ -210,3 +210,7 @@ __marimo__/
 
 #demo data
 data/demo/
+
+# Cache files
+store_cache.json
+

@@ -1,5 +1,6 @@
 from api.steam_webapi import resolve_steam_id, fetch_owned_games
 from api.steam_store import fetch_store_metadata
+from data.store_cache import store_cache_get, store_cache_set
 from src.snapshots import create_snapshot, Snapshot
 from src.vectors import extract_games
 
@@ -16,7 +17,11 @@ def enrich_games(games: list[dict], top_n: int = 5) -> list[dict]:
 
     enriched = []
     for g in sorted_games:
-        genres, categories = fetch_store_metadata(g["appid"])
+        genres, categories = store_cache_get(g["appid"])
+        if not genres and not categories:
+            genres, categories = fetch_store_metadata(g["appid"])
+            store_cache_set(g["appid"], g.get("name"), genres, categories)
+        
         enriched.append({
             "appid": g["appid"],
             "name": g.get("name"),
