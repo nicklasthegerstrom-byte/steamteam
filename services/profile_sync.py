@@ -1,4 +1,3 @@
-from datetime import datetime
 from api.steam_webapi import resolve_steam_id, fetch_owned_games
 from api.steam_store import fetch_store_metadata
 from src.snapshots import create_snapshot, Snapshot
@@ -61,12 +60,19 @@ def sync_user_profile(user_string: str, top_n: int = 5, user_id: int = None) -> 
 
     # enrich with store metadata
     enriched_games = enrich_games(games, top_n)
+    
+    # create steam user dict
+    steam_dict = {
+        "steam_id": steam_id,
+        "game_count": len(enriched_games),
+        "games": enriched_games
+    }
 
     # create snapshot with vectors
-    extracted = extract_games({"games": enriched_games})
+    extracted = extract_games(steam_dict)
     snapshot_user_id = user_id
     if not snapshot_user_id:
-        raise ValueError("user_id must be provided to create a Snapshot")
+        raise ValueError("user_id must be provided to create a snapshot")
 
     snapshot: Snapshot = create_snapshot(snapshot_user_id, extracted)
 
