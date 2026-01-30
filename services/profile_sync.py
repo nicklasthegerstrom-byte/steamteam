@@ -29,7 +29,7 @@ def enrich_games(games: list[dict], top_n: int = 5) -> list[dict]:
 
 # ------------------ Public function ------------------
 
-def sync_user_profile(user_string: str, top_n: int = 5, user_id: int = None) -> Snapshot:
+def sync_user_profile(steam_user_input: str, user_id: int, top_n: int = 5) -> Snapshot:
     """
     Full profile sync:
     1. Resolve SteamID
@@ -53,7 +53,7 @@ def sync_user_profile(user_string: str, top_n: int = 5, user_id: int = None) -> 
     """
 
     # resolve SteamID
-    steam_id = resolve_steam_id(user_string)
+    steam_id = resolve_steam_id(steam_user_input)
 
     # fetch owned games
     games = fetch_owned_games(steam_id)
@@ -79,3 +79,22 @@ def sync_user_profile(user_string: str, top_n: int = 5, user_id: int = None) -> 
     # return snapshot
     return snapshot
 
+
+# ------------------ Manual testing ------------------
+
+if __name__ == "__main__":
+    import json
+    print("Running module directly for manual testing")
+    
+    steam_user_input = input("Enter SteamID or vanity or profile URL: ")
+    user_id_input = int(input("Enter SteamTeam userID <int>: "))
+    top_n_input = int(input("Enter amount of top games to fetch <int>: "))
+    
+    print(f"calling: sync_user_profile(steam_user_input={steam_user_input}, user_id={user_id_input}, top_n={top_n_input})")
+    snapshot = sync_user_profile(steam_user_input, user_id_input, top_n_input)
+    
+    print("calling: print(snapshot)")
+    print(snapshot)
+    
+    print("calling: print(json.dumps(snapshot.to_dict, indent=4)")
+    print(json.dumps(snapshot.to_dict(), indent=4))
