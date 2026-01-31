@@ -23,8 +23,8 @@ def create_tables(db_path: Path = DB_PATH) -> None:
             email       TEXT UNIQUE NOT NULL,
             username    TEXT UNIQUE NOT NULL,
             steam_id    TEXT UNIQUE,
-            created_at  TEXT NOT NULL
-        );
+            created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
 
         CREATE TABLE IF NOT EXISTS snapshots (
             snapshot_id    INTEGER PRIMARY KEY AUTOINCREMENT,
