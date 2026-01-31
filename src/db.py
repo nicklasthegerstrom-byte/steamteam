@@ -191,6 +191,57 @@ class SnapshotDB:
             snaps.append(Snapshot.from_dict(data))
             #returnerar en lista med alla användars snapshots i rätt format (keys som int)
         return snaps
+    
+class GameCache:
+    def __init__(self, conn: sqlite3.Connection):
+        self.conn = conn
+
+    #Kolla om spelet finns i databasen redan
+    def get_game(self, appid: int) -> dict | None:
+        cur = self.conn.execute(
+            """
+            SELECT appid, name, genres_json, categories_json, last_updated
+            FROM games_cache
+            WHERE appid = ?
+            """,
+            (appid,)
+        )
+        row = cur.fetchone()
+
+        if row is None:
+            return None
+
+        return {
+            "appid": row[0],
+            "name": row[1],
+            "genres": json.loads(row[2]),
+            "categories": json.loads(row[3]),
+            "last_updated": row[4],
+        }
+
+    #Om spelet inte fanns, spara det med denna, tillsammans med en lista med genres och categories
+    def save_game(
+        self,
+        appid: int,
+        name: str,
+        genres: list[str],
+        categories: list[str]
+    ) -> None:
+        self.conn.execute(
+            """
+            INSERT OR REPLACE INTO games_cache
+            (appid, name, genres_json, categories_json, last_updated)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                appid,
+                name,
+                json.dumps(genres, ensure_ascii=False),
+                json.dumps(categories, ensure_ascii=False),
+                datetime.now().isoformat()
+            )
+        )
+        self.conn.commit()    
 
 
 if __name__ == "__main__":
