@@ -1,5 +1,9 @@
 import sqlite3
+import json
 from pathlib import Path
+
+from src.snapshots import Snapshot
+
 
 BASE_DIR = Path(__file__).resolve().parents[1]  # repo root
 DB_PATH = BASE_DIR / "data" / "db" / "steamteam.sqlite3"
@@ -24,7 +28,7 @@ def create_tables(db_path: Path = DB_PATH) -> None:
             username    TEXT UNIQUE NOT NULL,
             steam_id    TEXT UNIQUE,
             created_at  TEXT NOT NULL DEFAULT (datetime('now'))
-);
+        );
 
         CREATE TABLE IF NOT EXISTS snapshots (
             snapshot_id    INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,6 +51,146 @@ def create_tables(db_path: Path = DB_PATH) -> None:
 
     conn.commit()
     conn.close()
+
+#Klass där funktioner för att prata med databasen bor
+class UserDB:
+    def __init__(self, conn: sqlite3.Connection):
+        self.conn = conn
+
+    def insert_user(
+        self,
+        email: str,
+        username: str,
+        steam_id: str | None = None
+    ) -> int:
+        try:
+            cur = self.conn.execute(
+                """
+                INSERT INTO users (email, username, steam_id)
+                VALUES (?, ?, ?)
+                """,
+                (email, username, steam_id),
+            )
+            self.conn.commit()
+
+            user_id = int(cur.lastrowid)
+            #returnerar ett user_id (int)
+            return user_id
+
+        except sqlite3.IntegrityError as e:
+            msg = str(e).lower()
+            if "users.email" in msg:
+                raise ValueError("Email already exists") from e
+            if "users.username" in msg:
+                raise ValueError("Username already exists") from e
+            if "users.steam_id" in msg:
+                raise ValueError("Steam ID already exists") from e
+            raise ValueError("User violates database constraints") from e
+
+    #Funktion för att hämta användardata med EMAIL och/eller USERNAME.
+    def get_user(
+        self,
+        *,
+        email: str | None = None,
+        username: str | None = None,
+    ) -> dict | None:
+
+        if email is None and username is None:
+            raise ValueError("Provide at least email or username")
+
+        query = """
+        SELECT user_id, email, username, steam_id, created_at
+        FROM users
+        WHERE 1=1
+        """
+        params: list[str] = []
+
+        #För att funktionen ska funka med email, ELLER usernamn, ELLER båda två!
+        if email is not None:
+            query += " AND email = ?"
+            params.append(email)
+
+        if username is not None:
+            query += " AND username = ?"
+            params.append(username)
+
+        cur = self.conn.execute(query, tuple(params))
+        row = cur.fetchone()
+
+        if row is None:
+            return None
+
+        return {
+            "user_id": row[0],
+            "email": row[1],
+            "username": row[2],
+            "steam_id": row[3],
+            "created_at": row[4],
+        }
+
+    #Förslag? update_user_steam_id(user_id: int)
+
+#Klass med funktioner för snapshotfunktioner
+class SnapshotDB:
+    def __init__(self, conn: sqlite3.Connection):
+        self.conn = conn
+
+    def insert_snapshot(self, snapshot: Snapshot) -> int:
+        #sparar snapshot som sträng med to dict
+        snapshot_data = json.dumps(snapshot.to_dict(), ensure_ascii=False)
+
+        cur = self.conn.execute(
+            """
+            INSERT INTO snapshots (user_id, created_at, snapshot_json)
+            VALUES (?, ?, ?)
+            """,
+            (snapshot.user_id, snapshot.created_at.isoformat(), snapshot_data)
+        )
+        self.conn.commit()
+
+        #returnerar ett snapshot_id (int)
+        snapshot_id = int(cur.lastrowid)
+        return snapshot_id
+
+    def load_latest_snapshot(self, user_id: int) -> Snapshot | None:
+        cur = self.conn.execute(
+            """
+            SELECT snapshot_json
+            FROM snapshots
+            WHERE user_id = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (user_id,)
+        )
+        row = cur.fetchone()
+
+        if row is None:
+            return None
+
+        data = json.loads(row[0])          # text -> dict (keys är strings här)
+        return Snapshot.from_dict(data)     # dict -> Snapshot (appid-keys tillbaka till int)
+
+    def load_all_latest_snapshots(self) -> list[Snapshot]:
+        cur = self.conn.execute(
+            """
+            SELECT s.snapshot_json
+            FROM snapshots s
+            JOIN (
+                SELECT user_id, MAX(created_at) AS max_created
+                FROM snapshots
+                GROUP BY user_id
+            ) latest
+            ON latest.user_id = s.user_id AND latest.max_created = s.created_at
+            """
+        )
+
+        snaps: list[Snapshot] = []
+        for (snapshot_json,) in cur.fetchall():
+            data = json.loads(snapshot_json)
+            snaps.append(Snapshot.from_dict(data))
+            #returnerar en lista med alla användars snapshots i rätt format (keys som int)
+        return snaps
 
 
 if __name__ == "__main__":
