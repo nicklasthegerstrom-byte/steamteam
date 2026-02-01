@@ -47,10 +47,7 @@ def load_store_games() -> list[dict]:
     with GAME_DATA_FILE.open(encoding="utf-8") as f:
         data = json.load(f)
 
-    if not isinstance(data, list):
-        raise ValueError(f"{GAME_DATA_FILE} must contain a list of games")
-
-    return data
+    return list(data.values())
 
 
 # ==========================================================
@@ -158,7 +155,7 @@ def seed_fake_accounts() -> None:
         # Create snapshot
         print(f"creating snapshot...")
         extracted = extract_games(steam_profile)
-        snapshot = create_snapshot(user_id=user_id, extracted=extracted)
+        snapshot = create_snapshot(user_id=user_id, games=extracted)
         print(f"snapshot created for user_id={snapshot.user_id}")
 
         # --------------------------------------------
