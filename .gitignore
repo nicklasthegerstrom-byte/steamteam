@@ -207,6 +207,11 @@ marimo/_lsp/
 __marimo__/
 .env
 
-
 #demo data
 data/demo/
+
+# Cache files
+store_cache.json
+
+# database
+*.sqlite3
