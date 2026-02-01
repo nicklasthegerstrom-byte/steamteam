@@ -11,6 +11,7 @@ def fake_store_response():
         "123": {
             "success": True,
             "data": {
+                "name": "examplename",
                 "genres": [{"description": "RPG"}, {"description": "Adventure"}],
                 "categories": [{"description": "Single-player"}, {"description": "Co-op"}]
             }
@@ -33,7 +34,12 @@ def test_fetch_store_metadata_happy(monkeypatch, fake_store_response):
 
     monkeypatch.setattr(steam_store.requests, "get", fake_get)
 
-    genres, categories = steam_store.fetch_store_metadata(123)
+    data = steam_store.fetch_store_metadata(123)
+    name = data["name"]
+    genres = data["genres"]
+    categories = data["categories"]
+    
+    assert name == "examplename"
     assert genres == ["RPG", "Adventure"]
     assert categories == ["Single-player", "Co-op"]
 
@@ -47,10 +53,9 @@ def test_fetch_store_metadata_fail(monkeypatch, fake_store_failure):
 
     monkeypatch.setattr(steam_store.requests, "get", fake_get)
 
-    genres, categories = steam_store.fetch_store_metadata(123)
-    # Fail-soft return empty lists
-    assert genres == []
-    assert categories == []
+    data = steam_store.fetch_store_metadata(123)
+    
+    assert data is None
 
 def test_fetch_store_metadata_request_exception(monkeypatch):
     # Mock requests.get that raises RequestException
@@ -59,7 +64,6 @@ def test_fetch_store_metadata_request_exception(monkeypatch):
 
     monkeypatch.setattr(steam_store.requests, "get", fake_get)
 
-    genres, categories = steam_store.fetch_store_metadata(123)
-    # Fail-soft return empty lists
-    assert genres == []
-    assert categories == []
+    data = steam_store.fetch_store_metadata(123)
+    
+    assert data is None
