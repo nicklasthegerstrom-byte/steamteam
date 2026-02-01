@@ -1,46 +1,36 @@
-import json
-from pathlib import Path
+from src.db import get_connection, GameCache
+from api.steam_store import fetch_store_metadata
 
-CACHE_FILE = Path(__file__).parent / "store_cache.json"
+__all__ = ["get_game"]
 
-# ------------------ Internal helpers ------------------
+def _fetch_game_data(appid: int) -> dict | None:
+    """Fetch game metadata from Steam Store API"""
+    return fetch_store_metadata(appid)
 
-def _load_cache() -> dict:
-    if CACHE_FILE.exists():
-        try:
-            with CACHE_FILE.open(encoding="utf-8") as f:
-                return json.load(f)
-        except json.JSONDecodeError:
-            print("Warning: store cache corrupted, starting fresh")
-    return {}
-
-def _save_cache(cache: dict) -> None:
-    with CACHE_FILE.open("w", encoding="utf-8") as f:
-        json.dump(cache, f, indent=4)
-
-# ------------------ Public API ------------------
-
-def store_cache_get(appid: int):
+def get_game(appid: int) -> dict | None:
     """
-    Returns (genres, categories) for appid if cached.
-    Returns ([], []) if not found.
+    Return cached game metadata from DB, fetch if not cached.
+    Returns dict with keys: appid, name, genres, categories or None if failed.
     """
-    cache = _load_cache()
-    entry = cache.get(str(appid))
-    if not entry:
-        return [], []
+    conn = get_connection()
+    game_cache = GameCache(conn)
 
-    return entry.get("genres", []), entry.get("categories", [])
+    cached: dict | None = game_cache.get_game(appid)
 
-def store_cache_set(appid: int, name: str, genres: list[str], categories: list[str]) -> None:
-    """
-    Store Steam Store metadata for an appid.
-    """
-    cache = _load_cache()
-    cache[str(appid)] = {
-        "appid": appid,
-        "name": name,
-        "genres": genres,
-        "categories": categories,
-    }
-    _save_cache(cache)
+    if cached:
+        return cached
+
+    # fetch if not cached
+    game_data: dict | None = _fetch_game_data(appid)
+    if not game_data:
+        print(f"Warning: Could not fetch store metadata for appid {appid}")
+        return None
+
+    game_cache.save_game(
+        appid=appid,
+        name=game_data["name"],
+        genres=game_data["genres"],
+        categories=game_data["categories"]
+    )
+
+    return game_data
