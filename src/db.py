@@ -93,17 +93,18 @@ class UserDB:
         *,
         email: str | None = None,
         username: str | None = None,
+        user_id: int | None = None
     ) -> dict | None:
 
-        if email is None and username is None:
-            raise ValueError("Provide at least email or username")
+        if email is None and username is None and user_id is None:
+            raise ValueError("Provide at least email, username or user_id")
 
         query = """
         SELECT user_id, email, username, steam_id, created_at
         FROM users
         WHERE 1=1
         """
-        params: list[str] = []
+        params: list[object] = []
 
         #För att funktionen ska funka med email, ELLER usernamn, ELLER båda två!
         if email is not None:
@@ -113,6 +114,10 @@ class UserDB:
         if username is not None:
             query += " AND username = ?"
             params.append(username)
+
+        if user_id is not None:
+            query += " AND user_id = ?"
+            params.append(user_id)
 
         cur = self.conn.execute(query, tuple(params))
         row = cur.fetchone()
