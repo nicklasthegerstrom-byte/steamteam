@@ -1,4 +1,4 @@
-from src.db import get_connection, SnapshotDB
+from src.db import get_connection, UserDB, SnapshotDB
 from src.snapshots import create_snapshot, Snapshot
 from api.steam_webapi import resolve_steam_id, fetch_owned_games
 from src.vectors import extract_games
@@ -45,7 +45,7 @@ def enrich_games(games: list[dict], top_n: int = 5) -> list[dict]:
 
 # ------------------ Public function ------------------
 
-def sync_user_profile(steam_user_input: str, user_id: int, top_n: int = 5) -> Snapshot:
+def sync_user_profile(user_id: int, top_n: int = 5) -> Snapshot:
     """
     Full profile sync:
     1. Resolve SteamID
@@ -55,7 +55,13 @@ def sync_user_profile(steam_user_input: str, user_id: int, top_n: int = 5) -> Sn
     5. Save snapshot to DB
     6. Return snapshot
     """
-    steam_id: str = resolve_steam_id(steam_user_input)
+    conn = get_connection()
+    user_db = UserDB(conn)
+    user = user_db.get_user(user_id=user_id)
+    steam_id = user.get("steam_id")
+    conn.close()
+    
+    steam_id: str = resolve_steam_id(steam_id)
     games: list[dict] = fetch_owned_games(steam_id)
     enriched_games: list[dict] = enrich_games(games, top_n)
 
