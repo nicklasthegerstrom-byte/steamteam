@@ -213,3 +213,5 @@ data/demo/
 # Cache files
 store_cache.json
 
+# database
+*.sqlite3
