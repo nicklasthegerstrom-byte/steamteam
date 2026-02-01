@@ -17,13 +17,13 @@ from pathlib import Path
 # ==========================================================
 
 SEED = 42
-NUM_USERS = 10
+NUM_USERS = 100
 MIN_GAMES_PER_USER = 3
 MAX_GAMES_PER_USER = 20
 
 random.seed(SEED)
 
-GAME_DATA_FILE = Path(__file__).parent / "example_steam_games.json"
+GAME_DATA_FILE = Path(__file__).resolve().parents[1] / "data" / "example_steam_games.json"
 
 # ==========================================================
 # APP IMPORTS
@@ -33,7 +33,7 @@ from src.snapshots import create_snapshot
 from src.vectors import extract_games
 
 # DB functions
-from src.db_functions import insert_user, insert_snapshot
+from src.db import create_tables, get_connection, UserDB, SnapshotDB
 
 
 # ==========================================================
@@ -115,12 +115,17 @@ def generate_fake_steam_profile(user_index: int, store_games: list[dict]) -> dic
 # ==========================================================
 
 def seed_fake_accounts() -> None:
+    create_tables()
+    conn = get_connection()
+    user_db = UserDB(conn)
+    snapshot_db = SnapshotDB(conn)
     store_games = load_store_games()
-    print(f"Loaded {len(store_games)} Steam store games from: {GAME_DATA_FILE}")
+    
+    print(f"loaded {len(store_games)} Steam store games from: {GAME_DATA_FILE}")
 
     for i in range(1, NUM_USERS + 1):
         print("-" * 50)
-        print(f"Creating fake user {i} out of {NUM_USERS}")
+        print(f"creating fake user {i} out of {NUM_USERS}")
 
         # Fake SteamTeam credentials
         username = generate_fake_username(i)
@@ -136,32 +141,39 @@ def seed_fake_accounts() -> None:
         # DB: create user
         # --------------------------------------------
         
-        user_id = insert_user(
-            email=email,
-            username=username,
-            steam_id=steam_profile["steam_id"]
-        )
+        try:
+            user_id = user_db.insert_user(
+                email=email,
+                username=username,
+                steam_id=steam_profile["steam_id"]
+            )
+            print(f"user saved to database with user_id: {user_id}")
+        
+        except ValueError as e:
+            print(f"error adding user: {e}")
+            print("skipping..")
+            continue
 
-        print(f"user saved to database with user_id: {user_id}")
 
         # Create snapshot
         print(f"creating snapshot...")
         extracted = extract_games(steam_profile)
         snapshot = create_snapshot(user_id=user_id, extracted=extracted)
-        print(snapshot)
-        print("snapshot created")
+        print(f"snapshot created for user_id={snapshot.user_id}")
 
         # --------------------------------------------
         # DB: save snapshot
         # --------------------------------------------
         
-        snapshot_id = insert_snapshot(snapshot)
+        snapshot_id = snapshot_db.insert_snapshot(snapshot)
         print(f"snapshot saved to database with id: {snapshot_id}")
         
         print("account created")
-
+    
+    conn.close()
+    
     print("-" * 50)
-    print("Seeding complete!")
+    print("seeding complete!")
 
 
 # ==========================================================
