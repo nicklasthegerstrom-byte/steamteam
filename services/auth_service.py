@@ -17,14 +17,14 @@ def login(username: str, email: str) -> dict | None:
         conn.close()
 
 
-def signup(username: str, email: str) -> int:
+def signup(username: str, email: str, steam_id: str) -> int:
     if not username or not email:
         raise ValueError("Username and email are required")
 
     conn = get_connection()
     try:
         user_db = UserDB(conn)
-        return user_db.insert_user(username=username, email=email)
+        return user_db.insert_user(username=username, email=email, steam_id=steam_id)
     finally:
         conn.close()
 
