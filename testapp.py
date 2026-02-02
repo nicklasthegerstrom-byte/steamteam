@@ -141,8 +141,14 @@ def match_view(user: User) -> None:
         print("[+] Done\n")
 
         print("Best matches:")
-        for uid, score in matches:
-            print(f"User {uid}: {score:.3f}")
+        for i, match in enumerate(matches):
+            print(
+                f"{i+1:>3}. "
+                f"Score: {match['score']:<7.2%} | "
+                f"ID: {match['user_id']:<6} | "
+                f"Username: {match['username']:<20} | "
+                f"Steam: {match['steam_id']}"
+            )
 
         return match_view(user)
 
