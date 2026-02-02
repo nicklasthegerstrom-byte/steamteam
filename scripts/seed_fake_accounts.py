@@ -101,7 +101,7 @@ def generate_fake_steam_profile(user_index: int, store_games: list[dict]) -> dic
     games = generate_fake_owned_games(store_games)
 
     return {
-        "steam_id": f"fake_{user_index}",
+        "steam_id": f"{''.join(str(random.randint(1, 9)) for _ in range(17))}",
         "game_count": len(games),
         "games": games,
     }
@@ -133,6 +133,7 @@ def seed_fake_accounts() -> None:
 
         # Fake Steam profile
         steam_profile = generate_fake_steam_profile(i, store_games)
+        print(f"steam_id: {steam_profile['steam_id']}")
 
         # --------------------------------------------
         # DB: create user
