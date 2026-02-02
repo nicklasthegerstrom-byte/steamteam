@@ -34,4 +34,4 @@ jobs:
           pip install pytest
 
       - name: Run tests
-        run: python3 -m pytest tests
+        run: python3 -m pytest -v --tb=short --timeout=30 tests
