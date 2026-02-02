@@ -1,176 +1,110 @@
 ![SteamTeam](steamteam.jpg)
 
 # Steamteam
-Match with other users based on gaming interests.
+Find players with similar gaming interests on Steam.
 
-## About
-This project allows users to import their Steam game data and discover other users with similar gaming interests.
-By analyzing played games, genres, and game IDs, the application matches users based on shared preferences.
-The goal is to help players find like-minded gamers and potential gaming partners through data-driven matching.
+---
 
-## Features
--  User accounts creation system  
--  Game related data via Steam API support  
--  Graphical user interface  
--  User matching algoritm  with data vector technology  
--  SQLite3 for database management  
+## 🎮 What is Steamteam?
 
-## Requirements
--  Internet connection
--  Steam account  
--  Steam Web API-key
--  Python3
+Steamteam is an application that helps players discover other users with similar gaming preferences.
 
-## Installation
-Open a terminal / command prompt and run the following commands.  
-During installation replace `python` with `python3` or `py` depending on your system.  
-### 1. Clone the repository 
-   ```
-   git clone https://github.com/nicklasthegerstrom-byte/steamteam.git
-   ```
+Instead of relying on friend lists or manual searching, Steamteam analyzes:
+- played games
+- genres
+- playtime distribution
 
-### 2. Navigate to project foler  
-   ```
-   cd steamteam
-   ```
+and matches users using **vector-based similarity**.
 
-### 3. Create a virtual environment  
-   ```
-   python -m venv venv
-   ```
-### 4. Activate the virtual environment
-Windows PowerShell:  
-```  
-venv\Scripts\activate  
-```
-MacOS / Linux terminal:  
-```
-source venv/bin/activate  
-```
+The goal is to make it easier to find like-minded gamers and potential gaming partners in a data-driven way.
 
-### 5. Install dependencies  
-This will install all dependencies from `requirements.txt`  
-  ```
-  pip install -r requirements.txt
-  ```
-### 6. Get a Steam API Key 
-(Skip if you already have one)  
-1. Log in to your Steam account  
-2. Visit the Steam Web API key registration page:  
-  https://steamcommunity.com/dev/apikey
-3. Register a new API key (a domain name is required, but any placeholder works for development)
-Copy the generated key and add it to your .env file (it is gitignored)  
+---
 
-### 7. Setup API Key  
-Create `.env` file in project root:  
+## 🧠 How it works (high level)
 
-Windows PowerShell:
-```
-New-Item .env
-```
-MacOS / Linux terminal:  
-```
-touch .env
-```  
-Edit `.env` and add your Steam API key:
-   ```
-   STEAM_API_KEY=your_api_key_here
-   ```
+1. A user connects their Steam account  
+2. Steam game data is fetched via the Steam Web API  
+3. The data is transformed into **weighted vectors**  
+4. A **snapshot** of the user profile is created  
+5. Users are matched by comparing snapshots using similarity algorithms  
 
-## Running
-Run `app.pyw` from the project root folder:    
-```
-python app.pyw
-```
+The matching logic does **not** use raw Steam data directly – it only works on snapshots.
 
-## Contributors  
-   Constantine - [AeolianOpus](https://github.com/AeolianOpus)  
+---
 
-   Even - [evenhadeghe](https://github.com/evenhadeghe)  
+## 📸 What is a Snapshot?
 
-   Nicklas - [nicklasthegerstrom-byte](https://github.com/nicklasthegerstrom-byte)  
+A **snapshot** is a compact, comparable representation of a user’s gaming profile at a specific moment in time.
 
-   Erik - [ErikCoderMan](https://github.com/ErikCoderMan)  
+Each snapshot contains:
+- `user_id` – internal Steamteam user ID  
+- `created_at` – timestamp  
+- `game_vector` – weighted game IDs  
+- `genre_vector` – weighted genres  
 
-   Adam - [adamwelday](https://github.com/adamwelday)
+Snapshots can be:
+- printed (for debugging and testing)  
+- saved as JSON  
+- stored in the database  
+- compared efficiently during matching  
 
-## Development Workflow
+This separation keeps matching fast, stable, and reproducible.
 
-The project structure is set up in the dev branch.
-All development work should follow the workflow below.
+---
 
-#### 1. Setup and Branching  
-Open your CLI and navigate to the project directory:  
-```
-   cd "path/to/your/project-folder"
-   cd steamteam
-   git checkout dev  
-   git pull
-```
-Create a new branch to work in:
-```
-   git checkout -b feat/matching
-```
-Branch naming is important.
-This is only an example. Use clear and descriptive names such as:  
-`feat/matching`, `docs/readme`, `db/database`, `test/tests`
+## 🧮 Matching logic
 
-The goal is that everyone (and the tech lead) can easily understand what you are working on.  
-Pull requests with unclear or misleading branch names may be rejected.  
+Users are matched using **cosine similarity** on vectors.
 
-#### 2. First Push (Important)
+Two signals are combined:
+- **Genre similarity** (primary signal)  
+- **Game similarity** (secondary signal)  
 
-The first time you push a new branch, you must run:
-```
-   git push -u origin <branch-name>
-```
-This is required unless you have configured a global push.autoSetupRemote.
+Each user is compared against others, producing a match score between `0.0` and `1.0`.
 
-#### 3. Creating Files Correctly
+Higher score = more similar gaming preferences.
 
-When creating new files, make sure they are placed in the correct directory from the start.  
-Example if settings.py should be located in the data folder:
+---
 
-Windows PowerShell:  
-```
-   New-Item .\data\settings.py -Force
-```
-MacOS / Linux terminal:  
-```
-   touch data/settings.py
-```
+## 🗄️ Database design
 
-Always verify that files are created in the correct location before starting work.
+Steamteam uses **SQLite** for simplicity and portability.
 
-#### 4. Development and Commits
+The database contains three main tables:
 
-- Work only inside your own branch.
-- Commit your changes properly
-- Remember to:
-  - Save your files (CTRL + S in VS Code)  
-  - Commit your changes properly  
+### users
+Stores Steamteam users (not Steam accounts).
 
-Example:
-```  
-   git add .
-   git commit -m "Clear and descriptive commit message"
-   git push
-```
+### snapshots
+Stores serialized snapshot data used for matching.
 
-#### 5. Pull Request to dev
+### games_cache
+Caches Steam Store metadata (genres, categories) to reduce API calls and support future GUI features.
 
-When your work is complete and ready to be merged:  
-- Go to the steamteam repository on GitHub  
-- Open the Pull Requests tab  
-- Click Create Pull Request  
-- Set:
-  - Base branch (left): dev
-  - Compare branch (right): your feature branch  
+Snapshots are stored as JSON blobs to keep the vector format flexible and version-safe.
 
-Submit the pull request.
+---
 
-#### 6. Review  
-The tech lead will review the pull request on GitHub and approve or request changes before merging into dev.
+## 🖥️ Features
 
+- User account system  
+- Steam Web API integration  
+- Snapshot-based matching  
+- Vector similarity algorithms  
+- SQLite database persistence  
+- Graphical user interface (WIP)  
 
+---
 
+## ⚙️ Requirements
+
+- Python 3  
+- Steam account  
+- Steam Web API key  
+- Internet connection  
+
+---
+
+## 🚀 Running the application
+
+1. Clone the repository  
