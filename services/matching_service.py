@@ -13,25 +13,13 @@ def match_snapshot_to_all(target_snapshot: Snapshot, top_n: int = 5) -> list:
 
     all_snapshots = snapshot_db.load_all_latest_snapshots()
     conn.close()
-
-    # Convert to dict {user_id: {"genre_vector":..., "game_vector":...}}
-    other_users = {
-        s.user_id: {
-            "genre_vector": s.genre_vector,
-            "game_vector": s.game_vector
-        }
-        for s in all_snapshots
-        if s.user_id != target_snapshot.user_id
-    }
-
+    
     return find_best_matches(
-        target_user_id=target_snapshot.user_id,
-        target_genre_vector=target_snapshot.genre_vector,
-        target_game_vector=target_snapshot.game_vector,
-        other_users=other_users,
+        target_snapshot=target_snapshot,
+        other_snapshots=[snap for snap in all_snapshots if snap.user_id != target_snapshot.user_id],
         top_n=top_n
     )
-
+    
 
 def match_user_id(user_id: int, top_n: int = 5) -> list:
     """
