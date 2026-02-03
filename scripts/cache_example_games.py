@@ -2,11 +2,14 @@ import json
 from pathlib import Path
 from time import perf_counter
 
+
 # ==========================================================
 # CONFIG
 # ==========================================================
 
-GAME_DATA_FILE = Path(__file__).resolve().parents[1] / "data" / "example_steam_games.json"
+from data.settings import SETTINGS
+GAME_DATA_FILE = SETTINGS.example_steam_games_path
+DB_PATH = SETTINGS.db_path
 
 # ==========================================================
 # APP IMPORTS
@@ -36,8 +39,13 @@ def load_store_games() -> list[dict]:
 def main():
     example_games = load_store_games()
     total = len(example_games)
-    print(f"This will cache data from {total} games in the GamesCache (sqlite3)")
+    print(f"Loaded: '{GAME_DATA_FILE}'")
+    print(f"This script will store loaded game data to disk (sqlite3)")
     print("The data is real and fetched from the Steam Store API")
+    print("Project will always attempt to get gamedata from disk before fetching")
+    print(f"Storing these games might help increase performance later on")
+    print(f"DB_PATH: '{DB_PATH}'")
+    print(f"Number of games to store: {total}")
     
     answer = input("Continue? (y/n):").strip().lower()
     if not answer.startswith("y"):
@@ -46,7 +54,7 @@ def main():
     
     start = perf_counter()
     conn = get_connection()
-    create_tables()  # Ensure tables exist
+    create_tables(db_path=DB_PATH)  # Ensure tables exist
     game_cache = GameCache(conn)
 
     print(f"Adding example games to GameCache...")
