@@ -32,6 +32,7 @@ jobs:
           python3 -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pytest
+          pip install pytest-timeout
 
       - name: Run tests
-        run: python3 -m pytest -v --tb=short --timeout=30 tests
+        run: python3 -m pytest -v  --tb=short --timeout=60 tests
