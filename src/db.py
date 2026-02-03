@@ -2,13 +2,11 @@ import sqlite3
 import json
 from pathlib import Path
 from datetime import datetime
-
+from data.settings import SETTINGS
 from src.snapshots import Snapshot
 
-
-BASE_DIR = Path(__file__).resolve().parents[1]  # repo root
-DB_PATH = BASE_DIR / "data" / "db" / "steamteam.sqlite3"
-
+# Full path to sqlite3 file
+DB_PATH = SETTINGS.db_path
 
 def get_connection(db_path: Path = DB_PATH) -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
