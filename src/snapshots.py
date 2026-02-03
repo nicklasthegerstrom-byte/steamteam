@@ -13,7 +13,7 @@ class Snapshot:
     game_vector: dict[int, float]
     genre_vector: dict[str, float]
     category_vector: dict[str, float]
-    top_games: list[dict]
+    top_games: list[dict] = field(default_factory=list)
 
     # Metod för att spara snapshot till en dict -> JSON/Databas
     def to_dict(self) -> dict:
