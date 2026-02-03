@@ -88,7 +88,6 @@ if __name__ == "__main__":
     import json
 
     print("=== Manual test for profile_sync ===")
-    steam_user_input = input("Enter SteamID / vanity / profile URL: ").strip()
     try:
         user_id_input = int(input("Enter SteamTeam user_id (int): ").strip())
     except ValueError:
@@ -102,7 +101,7 @@ if __name__ == "__main__":
         exit(1)
 
     print(f"\nSyncing profile for user_id={user_id_input}, top_n={top_n_input}...\n")
-    snapshot = sync_user_profile(steam_user_input, user_id_input, top_n_input)
+    snapshot = sync_user_profile(user_id_input, top_n_input)
 
     print("\n=== Snapshot object ===")
     print(snapshot)

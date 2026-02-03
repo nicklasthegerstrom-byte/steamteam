@@ -1,14 +1,60 @@
+from time import sleep
 from urllib.parse import urlparse
 import requests
 
 from data.settings import SETTINGS
 
+__all__ = ["resolve_steam_id", "fetch_owned_games"]
+
+# Steam Web API key
 STEAM_API_KEY = SETTINGS.steam_api_key
+
+# Fallback base URL
+_FB_BASE_URL = "https://api.steampowered.com"
+
+# Base URL, try from config, otherwise use fallback
+BASE_URL = (
+    SETTINGS.steam_webapi_base_url
+    if SETTINGS.steam_webapi_base_url and SETTINGS.steam_webapi_base_url.startswith("http")
+    else _FB_BASE_URL
+)
+
+TIMEOUT = SETTINGS.http_timeout_s
+RETRIES = SETTINGS.http_retries
+BACKOFF = SETTINGS.http_backoff_s
+
+HEADERS = {
+    "User-Agent": SETTINGS.user_agent,
+}
 
 if not STEAM_API_KEY:
     print("Warning: STEAM_API_KEY not found. Only mock functions will work.")
 
-__all__ = ["resolve_steam_id", "fetch_owned_games"]
+
+# ------------------ Internal function ------------------
+
+def _request_with_retry(url: str, params: dict, retries: int = RETRIES, backoff: float = BACKOFF) -> dict:
+    """
+    Internal helper to perform a GET request with retries/backoff.
+    Raises RuntimeError on network failure or ValueError on invalid JSON.
+    """
+    for attempt in range(retries):
+        try:
+            r = requests.get(url, params=params, timeout=TIMEOUT, headers=HEADERS)
+            r.raise_for_status()
+            payload = r.json()
+            return payload  # return directly
+            
+        except requests.RequestException as e:
+            if attempt < retries - 1:
+                sleep(backoff)
+                
+            else:
+                raise RuntimeError(f"Steam API request failed after {retries} attempts: {e}")
+                
+        except ValueError:
+            raise ValueError("Steam API returned invalid JSON")
+
 
 # ------------------ Web API functions ------------------
 
@@ -21,7 +67,7 @@ def resolve_steam_id(value: str) -> str:
     """
     if not STEAM_API_KEY:
         raise RuntimeError("STEAM_API_KEY is required for real Steam API calls")
-    
+
     value = value.strip()
 
     # Full URL
@@ -35,10 +81,10 @@ def resolve_steam_id(value: str) -> str:
         kind, identifier = parts
         if kind == "profiles":
             return identifier
-        if kind == "id":
-            vanity = identifier
+            
         elif kind == "id":
             vanity = identifier
+            
         else:
             raise ValueError("Profile URL must contain /id/ or /profiles/")
 
@@ -53,24 +99,17 @@ def resolve_steam_id(value: str) -> str:
     else:
         raise ValueError("Invalid Steam identifier")
 
-    # Resolve vanity via API
-    url = "https://api.steampowered.com/ISteamUser/ResolveVanityURL/v0001/"
+    # Resolve via Steam API
+    url = f"{BASE_URL}/ISteamUser/ResolveVanityURL/v0001/"
     params = {"key": STEAM_API_KEY, "vanityurl": vanity}
-
-    try:
-        r = requests.get(url, params=params, timeout=10)
-        r.raise_for_status()
-        payload = r.json()
-    except requests.RequestException as e:
-        raise RuntimeError(f"Vanity URL request failed: {e}")
-    except ValueError:
-        raise RuntimeError("Vanity URL API returned invalid JSON")
+    payload = _request_with_retry(url, params)
 
     data = payload.get("response", {})
     if data.get("success") == 1:
         return data.get("steamid")
-
-    raise ValueError("Could not resolve Steam ID")
+        
+    else:
+        raise ValueError("Could not resolve Steam ID: invalid vanity name or SteamID")
 
 
 def fetch_owned_games(steam_id: str) -> list[dict]:
@@ -80,21 +119,17 @@ def fetch_owned_games(steam_id: str) -> list[dict]:
     if not STEAM_API_KEY:
         raise RuntimeError("STEAM_API_KEY is required for real Steam API calls")
 
-    url = "https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/"
+    url = f"{BASE_URL}/IPlayerService/GetOwnedGames/v0001/"
     params = {
         "key": STEAM_API_KEY,
         "steamid": steam_id,
         "include_appinfo": True,
-        "include_played_free_games": True
+        "include_played_free_games": True,
     }
 
-    try:
-        r = requests.get(url, params=params, timeout=10)
-        r.raise_for_status()
-        data = r.json()
-    except requests.RequestException as e:
-        raise RuntimeError(f"Steam API request failed: {e}")
-    except ValueError:
-        raise RuntimeError("Steam API returned invalid JSON")
+    payload = _request_with_retry(url, params)
+    
+    data = payload.get("response", {})
+    
+    return data.get("games", [])
 
-    return data.get("response", {}).get("games", [])
