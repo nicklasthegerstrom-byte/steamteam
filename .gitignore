@@ -215,3 +215,8 @@ store_cache.json
 
 # database
 *.sqlite3
+data/db/
+
+# logs
+log/
+logs/
