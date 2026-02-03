@@ -11,7 +11,7 @@ def fake_steam_key(monkeypatch):
 # ------------------- Tests -------------------
 def test_resolve_steam_id(monkeypatch):
     # Fake HTTP response
-    def fake_get(url, params, timeout):
+    def fake_get(url, params, timeout, headers):
         return SimpleNamespace(
             raise_for_status=lambda: None,
             json=lambda: {"response": {"steamid": "76561198000000001", "success": 1}}
@@ -25,7 +25,7 @@ def test_resolve_steam_id(monkeypatch):
 def test_fetch_owned_games(monkeypatch):
     fake_games = [{"appid": 1, "name": "Game A", "playtime_forever": 100}]
 
-    def fake_get(url, params, timeout):
+    def fake_get(url, params, timeout, headers):
         return SimpleNamespace(
             raise_for_status=lambda: None,
             json=lambda: {"response": {"games": fake_games}}
