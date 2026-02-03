@@ -11,6 +11,7 @@ This script is meant to be:
 import json
 import random
 from pathlib import Path
+from time import perf_counter
 
 # ==========================================================
 # CONFIG
@@ -18,7 +19,7 @@ from pathlib import Path
 
 SEED = 42
 NUM_USERS = 100
-MIN_GAMES_PER_USER = 3
+MIN_GAMES_PER_USER = 5
 MAX_GAMES_PER_USER = 20
 
 random.seed(SEED)
@@ -31,8 +32,7 @@ GAME_DATA_FILE = Path(__file__).resolve().parents[1] / "data" / "example_steam_g
 
 from src.snapshots import create_snapshot
 from src.vectors import extract_games
-
-# DB functions
+from src.utils import progress_bar
 from src.db import create_tables, get_connection, UserDB, SnapshotDB
 
 
@@ -55,13 +55,19 @@ def load_store_games() -> list[dict]:
 # ==========================================================
 
 ADJECTIVES = [
-    "cool", "sleepy", "angry", "happy", "fast",
-    "epic", "calm", "smart", "slow", "crazy"
+    "cool", "sleepy", "angry", "happy", "fast", "epic", "calm", "smart", "slow", "crazy",
+    "fierce", "shy", "brave", "bold", "sneaky", "witty", "lucky", "grumpy", "silly", "mighty",
+    "fiery", "mysterious", "jolly", "curious", "cheerful", "dark", "bright", "gentle", "proud",
+    "wild", "silent", "stormy", "frozen", "fiendish", "playful", "swift", "tiny", "huge", "ancient",
+    "vicious", "honest", "lively", "calm", "savage", "sneaky", "daring", "fancy", "zany"
 ]
 
 NOUNS = [
-    "gamer", "wizard", "ninja", "knight",
-    "noob", "pro", "coder"
+    "gamer", "wizard", "ninja", "knight", "noob", "pro", "coder", "hunter", "warrior", "mage",
+    "archer", "rogue", "assassin", "paladin", "sorcerer", "ranger", "thief", "champion", "samurai", "gladiator",
+    "knightmare", "warlock", "guardian", "sentinel", "dragon", "beast", "hero", "villain", "phantom", "cyborg",
+    "robot", "pirate", "monk", "jester", "viking", "samurai", "druid", "bard", "swordsman", "goblin",
+    "troll", "giant", "elf", "orc", "sprite", "witch", "vampire", "zombie", "shadow", "noble", "hacker"
 ]
 
 
@@ -111,67 +117,62 @@ def generate_fake_steam_profile(user_index: int, store_games: list[dict]) -> dic
 # MAIN SEED FUNCTION
 # ==========================================================
 
-def seed_fake_accounts() -> None:
+def seed_fake_accounts(num_users: int = NUM_USERS) -> None:
+    print("Starting seed script...")
+    start = perf_counter()
+
+    print("Setting up database\nCreating tables if not existing...")
     create_tables()
     conn = get_connection()
     user_db = UserDB(conn)
     snapshot_db = SnapshotDB(conn)
+
+    print("Loading Steam example games from json...")
     store_games = load_store_games()
-    
-    print(f"loaded {len(store_games)} Steam store games from: {GAME_DATA_FILE}")
+    print(f"Loaded {len(store_games)} Steam store games from: {GAME_DATA_FILE}")
 
-    for i in range(1, NUM_USERS + 1):
-        print("-" * 50)
-        print(f"creating fake user {i} out of {NUM_USERS}")
 
-        # Fake SteamTeam credentials
+    # Counters
+    users_created = 0
+    snapshots_created = 0
+    failed_users = 0
+    print("Seeding fake users now...")
+    for i in range(1, num_users + 1):
+        bar = progress_bar(i, num_users, 20)
+        elapsed = perf_counter() - start
+        print(f"\r{bar} ({i}/{num_users}) ({elapsed:.2f}s elapsed)", end="", flush=True)
+
         username = generate_fake_username(i)
-        email = f"fake_user{i}@fake.com"
-
-        print(f"username: {username}")
-        print(f"email: {email}")
-
-        # Fake Steam profile
+        email = f"{username}@fake.com"
         steam_profile = generate_fake_steam_profile(i, store_games)
-        print(f"steam_id: {steam_profile['steam_id']}")
 
-        # --------------------------------------------
-        # DB: create user
-        # --------------------------------------------
-        
         try:
             user_id = user_db.insert_user(
                 email=email,
                 username=username,
                 steam_id=steam_profile["steam_id"]
             )
-            print(f"user saved to database with user_id: {user_id}")
-        
-        except ValueError as e:
-            print(f"error adding user: {e}")
-            print("skipping..")
+            users_created += 1
+
+        except ValueError:
+            failed_users += 1
             continue
 
-
-        # Create snapshot
-        print(f"creating snapshot...")
         extracted = extract_games(steam_profile)
         snapshot = create_snapshot(user_id=user_id, games=extracted)
-        print(f"snapshot created for user_id={snapshot.user_id}")
+        snapshot_db.insert_snapshot(snapshot)
+        snapshots_created += 1
 
-        # --------------------------------------------
-        # DB: save snapshot
-        # --------------------------------------------
-        
-        snapshot_id = snapshot_db.insert_snapshot(snapshot)
-        print(f"snapshot saved to database with id: {snapshot_id}")
-        
-        print("account created")
-    
     conn.close()
-    
-    print("-" * 50)
-    print("seeding complete!")
+
+    elapsed = perf_counter() - start
+
+    # Final summary
+    print("")
+    print(f"Users created     : {users_created}")
+    print(f"Snapshots created : {snapshots_created}")
+    print(f"Failed users      : {failed_users}")
+    print("\nSeeding completed!")
 
 
 # ==========================================================
@@ -179,4 +180,12 @@ def seed_fake_accounts() -> None:
 # ==========================================================
 
 if __name__ == "__main__":
-    seed_fake_accounts()
+    raw = input(f"Number of fake users to seed (default {NUM_USERS}) [int]: ").strip()
+    try:
+        num = NUM_USERS if not raw else int(raw)
+        
+    except ValueError:
+        raise ValueError("Number of users must be an integer")
+
+    seed_fake_accounts(num_users=num)
+
