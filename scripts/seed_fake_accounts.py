@@ -12,6 +12,8 @@ import json
 import random
 from pathlib import Path
 from time import perf_counter
+from data.settings import SETTINGS
+
 
 # ==========================================================
 # CONFIG
@@ -26,7 +28,8 @@ PT_HIGH = 600_000
 PT2_LOW = 60
 PT2_HIGH = 10_000
 
-GAME_DATA_FILE = Path(__file__).resolve().parents[1] / "data" / "example_steam_games.json"
+GAME_DATA_FILE = SETTINGS.example_steam_games_path
+
 
 # ==========================================================
 # APP IMPORTS
@@ -36,6 +39,7 @@ from src.snapshots import create_snapshot
 from src.vectors import extract_games
 from src.utils import progress_bar
 from src.db import create_tables, get_connection, UserDB, SnapshotDB
+
 
 # ==========================================================
 # LOAD STEAM STORE DATA
@@ -49,6 +53,7 @@ def load_store_games() -> list[dict]:
         data = json.load(f)
 
     return list(data.values())
+
 
 # ==========================================================
 # FAKE DATA GENERATORS
@@ -118,7 +123,7 @@ def seed_fake_accounts(
     print("Starting seed script...")
 
     print("Setting up database\nCreating tables if not existing...")
-    create_tables()
+    create_tables(db_path=SETTINGS.db_path)
     conn = get_connection()
     user_db = UserDB(conn)
     snapshot_db = SnapshotDB(conn)
@@ -132,7 +137,22 @@ def seed_fake_accounts(
     failed_users = 0
 
     print("Seeding fake users now...")
-    for i in range(1, num_users + 1):
+    
+    # Begin by creating a user with "dev", "dev" credentials
+    try:
+        dev_steam_profile = generate_fake_steam_profile(1, store_games, min_games_per_user, max_games_per_user, pt_low, pt_high, pt2_low, pt2_high)
+        user_id = user_db.insert_user(email="dev", username="dev", steam_id=dev_steam_profile["steam_id"])
+        users_created += 1
+        extracted = extract_games(dev_steam_profile)
+        snapshot = create_snapshot(user_id=user_id, games=extracted)
+        snapshot_db.insert_snapshot(snapshot)
+        snapshots_created += 1
+        
+    except ValueError:
+        failed_users+=1
+        
+    # Proceed with remaining users
+    for i in range(2, num_users + 1):
         bar = progress_bar(i, num_users, 20)
         elapsed = perf_counter() - start
         print(f"\r{bar} ({i}/{num_users}) ({elapsed:.2f}s elapsed)", end="", flush=True)
