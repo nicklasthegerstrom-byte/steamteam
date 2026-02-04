@@ -220,3 +220,6 @@ data/db/
 # logs
 log/
 logs/
+
+#Annoying macfile
+*.DS_STORE
