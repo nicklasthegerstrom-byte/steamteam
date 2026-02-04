@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 
+from gui.register_view import RegisterView
 from gui.profile_view import ProfileView
 from gui.match_view import MatchView
 
@@ -87,14 +88,14 @@ class MainWindow:
         ttk.Label(card, text="Login", style="CardTitle.TLabel").pack(anchor="w", padx=18, pady=(16, 6))
         ttk.Label(
             card,
-            text="Enter a username to continue.",
+            text="Enter a username or email to continue.",
             style="CardText.TLabel"
         ).pack(anchor="w", padx=18, pady=(0, 14))
 
         form = ttk.Frame(card, style="Card.TFrame")
         form.pack(fill="x", padx=18, pady=(0, 10))
 
-        ttk.Label(form, text="Username", style="CardText.TLabel").pack(anchor="w", pady=(0, 6))
+        ttk.Label(form, text="Username or email", style="CardText.TLabel").pack(anchor="w", pady=(0, 6))
         self.username_var = tk.StringVar()
         ttk.Entry(form, textvariable=self.username_var).pack(fill="x")
 
@@ -110,9 +111,10 @@ class MainWindow:
 
         ttk.Button(
             actions,
-            text="Create user (soon)",
-            command=self._enter_app_shell
+            text="Register user",
+            command=self._show_register
         ).pack(side="left")
+
 
     def _enter_app_shell(self):
         username = (self.username_var.get() or "").strip()
@@ -195,4 +197,9 @@ class MainWindow:
         self.current_user = None
         self._build_login_screen()
 
-        
+    def _show_register(self):
+        for w in self.container.winfo_children():
+            w.destroy()
+
+        self.register_view = RegisterView(self.container, on_back=self._build_login_screen)
+        self.register_view.show()
