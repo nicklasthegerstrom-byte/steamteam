@@ -110,6 +110,7 @@ def test_insert_and_load_latest_snapshot(conn: sqlite3.Connection) -> None:
         game_vector={570: 0.6, 730: 0.4},
         genre_vector={"Action": 1.0},
         category_vector={"Co-op": 0.5, "PvP": 0.5},
+        top_games=[],
     )
 
     snap_id = snaps.insert_snapshot(snapshot)
@@ -121,6 +122,7 @@ def test_insert_and_load_latest_snapshot(conn: sqlite3.Connection) -> None:
     assert loaded.game_vector == snapshot.game_vector
     assert loaded.genre_vector == snapshot.genre_vector
     assert loaded.category_vector == snapshot.category_vector
+    assert loaded.top_games == snapshot.top_games
 
 
 def test_load_latest_snapshot_returns_none_if_missing(conn: sqlite3.Connection) -> None:
@@ -143,6 +145,7 @@ def test_load_all_latest_snapshots_returns_one_per_user(conn: sqlite3.Connection
         game_vector={1: 1.0},
         genre_vector={"Action": 1.0},
         category_vector={"Co-op": 1.0},
+        top_games=[],
     )
     s1_new = Snapshot(
         user_id=u1,
@@ -150,6 +153,7 @@ def test_load_all_latest_snapshots_returns_one_per_user(conn: sqlite3.Connection
         game_vector={2: 1.0},
         genre_vector={"RPG": 1.0},
         category_vector={"PvP": 1.0},
+        top_games=[],
     )
 
     s2 = Snapshot(
@@ -158,6 +162,7 @@ def test_load_all_latest_snapshots_returns_one_per_user(conn: sqlite3.Connection
         game_vector={3: 1.0},
         genre_vector={"Indie": 1.0},
         category_vector={"Solo": 1.0},
+        top_games=[],
     )
 
     snaps.insert_snapshot(s1_old)
