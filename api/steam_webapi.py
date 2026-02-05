@@ -3,8 +3,10 @@ from urllib.parse import urlparse
 import requests
 
 from data.settings import SETTINGS
+from services.logger import get_logger
 
 __all__ = ["resolve_steam_id", "fetch_owned_games"]
+log = get_logger(__name__)
 
 # Steam Web API key
 STEAM_API_KEY = SETTINGS.steam_api_key
@@ -28,7 +30,7 @@ HEADERS = {
 }
 
 if not STEAM_API_KEY:
-    print("Warning: STEAM_API_KEY not found. Only mock functions will work.")
+    log.warning("STEAM_API_KEY not found. Only mock/local flows will work.")
 
 
 # ------------------ Internal function ------------------
@@ -40,6 +42,7 @@ def _request_with_retry(url: str, params: dict, retries: int = RETRIES, backoff:
     """
     for attempt in range(retries):
         try:
+            log.debug("Steam Web API request url=%s params_keys=%s", url, list(params.keys()))
             r = requests.get(url, params=params, timeout=TIMEOUT, headers=HEADERS)
             r.raise_for_status()
             payload = r.json()
@@ -47,13 +50,18 @@ def _request_with_retry(url: str, params: dict, retries: int = RETRIES, backoff:
             
         except requests.RequestException as e:
             if attempt < retries - 1:
+                log.warning("Steam Web API request failed (attempt %d/%d): %s", attempt + 1, retries, e)
                 sleep(backoff)
                 
             else:
+                log.error("Steam Web API request failed permanently after %d attempts", retries)
                 raise RuntimeError(f"Steam API request failed after {retries} attempts: {e}")
                 
         except ValueError:
             raise ValueError("Steam API returned invalid JSON")
+
+    # If retries is zero or loop exits without returning, raise to satisfy return contract
+    raise RuntimeError(f"Steam API request failed after {retries} attempts")
 
 
 # ------------------ Web API functions ------------------
@@ -127,9 +135,10 @@ def fetch_owned_games(steam_id: str) -> list[dict]:
         "include_played_free_games": True,
     }
 
-    payload = _request_with_retry(url, params)
-    
-    data = payload.get("response", {})
-    
-    return data.get("games", [])
+    payload = _request_with_retry(url, params)    
+    data = payload.get("response", {})    
+    games = data.get("games", [])
+    log.info("Owned games fetched steam_id=%s count=%d", steam_id, len(games))
+    return games
+
 
