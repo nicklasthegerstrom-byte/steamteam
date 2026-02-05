@@ -57,7 +57,7 @@ def print_framed(text: str, max_len: int = 40) -> None:
 # Main window
 # =========================
 def main_window() -> User:
-    print_framed("SteamTeam - (CLI Version")
+    print_framed("SteamTeam - (CLI Version)")
     print("1. Login")
     print("2. Signup")
     print("0. Exit")
