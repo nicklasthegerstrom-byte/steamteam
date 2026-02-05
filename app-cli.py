@@ -46,16 +46,22 @@ class User:
         print(f"email: {self.email}")
         print(f"steam_id: {self.steam_id}")
 
+def print_framed(text: str, max_len: int = 40) -> None:
+    max_len = max_len if max_len >= 40 else 0
+    print("x"+("-"*(max_len-2))+"x")
+    print("|"+text.center(max_len-2, " ")+"|")
+    print("x"+("-"*(max_len-2))+"x")
+    print("")
+
 # =========================
 # Main window
 # =========================
 def main_window() -> User:
-    print("=================================")
-    print(" SteamTeam - Temporary CLI ")
-    print("=================================")
+    print_framed("SteamTeam - (CLI Version")
     print("1. Login")
     print("2. Signup")
     print("0. Exit")
+    print("")
 
     choice = input("Select option: ").strip()
 
@@ -74,7 +80,7 @@ def main_window() -> User:
 # Signup window
 # =========================
 def signup_window() -> User:
-    print("\n----- Signup -----")
+    print_framed("Signup")
     username = input("Username: ").strip()
     email = input("Email: ").strip()
     steam_id = input("Enter SteamID / vanity / profile URL: ").strip()
@@ -93,7 +99,7 @@ def signup_window() -> User:
 # Login window
 # =========================
 def login_window() -> User:
-    print("\n----- Login -----")
+    print_framed("Login")
     username = input("Username: ").strip()
     email = input("Email: ").strip()
 
@@ -116,7 +122,7 @@ def login_window() -> User:
 # Profile view
 # =========================
 def profile_view(user: User) -> None:
-    print("\n----- Profile -----")
+    print_framed("Profile")
     user.print_details()
     print("")
     print("1. Sync profile")
@@ -125,6 +131,7 @@ def profile_view(user: User) -> None:
     print("4. Update username")
     print("5. Update email")
     print("0. Logout")
+    print("")
 
     choice = input("Select option: ").strip()
 
@@ -178,10 +185,11 @@ def profile_view(user: User) -> None:
 # Match view
 # =========================
 def match_view(user: User) -> None:
-    print("\n----- Match View -----")
+    print_framed("Matching")
     print("1. Find matches")
     print("2. Back to profile")
     print("0. Logout")
+    print("")
 
     choice = input("Select option: ").strip()
 
@@ -191,15 +199,20 @@ def match_view(user: User) -> None:
         print("[+] Done\n")
 
         print("Best matches:")
+        
+        w = '"' # used to wrap around keys, can be empty string if you want to remove but feel lazy
+        
         for i, match in enumerate(matches):
-            print(
-                f"{i+1:>3}. "
-                f"Score: {match['score']:<7.2%} | "
-                f"ID: {match['user_id']:<6} | "
-                f"Username: {match['username']:<20} | "
-                f"Steam: {match['steam_id']}"
-            )
-
+            print("-"*40)
+            print(f"Match: {i+1}")
+            print(f"Username: {w}{match.username}{w}")
+            print(f"Steam: {w}https://steamcommunity.com/profiles/{match.steam_id}/{w}")
+            print(f"Score: {match.score:.2%}")
+            print(f"Playstyles: {', '.join([f'{w}{k}{w}: {int(v*100)}' for k, v in match.playstyles.items()])}")
+            print(f"Top Genres: {', '.join([f'{w}{a}{w}: {int(b*100)}' for a, b in match.top_genres])}")
+            print(f"Top Games: {', '.join([f'{w}{a}{w}: {b}h' for a, b in match.top_games])}")
+        
+        print("")
         return match_view(user)
 
     elif choice == "2":
