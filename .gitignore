@@ -205,6 +205,8 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+,
 .env
 
 #demo data
@@ -222,4 +224,4 @@ log/
 logs/
 
 #Annoying macfile
-*.DS_STORE
+*.DS_Store
