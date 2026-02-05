@@ -1,7 +1,6 @@
 ![SteamTeam](steamteam-logo.png)
 
-# Steamteam
-Find players with similar gaming interests on Steam.
+Find your dreamteam (on Steam)
 
 ---
 
