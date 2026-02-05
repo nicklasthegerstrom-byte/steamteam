@@ -205,5 +205,23 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
-*.DS_Store
+
 ,
+.env
+
+#demo data
+data/demo/
+
+# Cache files
+store_cache.json
+
+# database
+*.sqlite3
+data/db/
+
+# logs
+log/
+logs/
+
+#Annoying macfile
+*.DS_Store
