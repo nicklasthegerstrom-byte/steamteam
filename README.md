@@ -56,9 +56,10 @@ This separation keeps matching fast, stable, and reproducible.
 
 Users are matched using **cosine similarity** on vectors.
 
-Two signals are combined:
+Three signals are combined:
 - **Genre similarity** (primary signal)  
 - **Game similarity** (secondary signal)  
+- **Category similarity** (third playstyle signal) 
 
 Each user is compared against others, producing a match score between `0.0` and `1.0`.
 
