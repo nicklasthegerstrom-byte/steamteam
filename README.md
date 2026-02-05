@@ -1,4 +1,4 @@
-![SteamTeam](steamteam.jpg)
+![SteamTeam](steamteam-logo.png)
 
 # Steamteam
 Find players with similar gaming interests on Steam.
