@@ -203,3 +203,8 @@ class MainWindow:
 
         self.register_view = RegisterView(self.container, on_back=self._build_login_screen)
         self.register_view.show()
+
+
+if name == "main":
+    MainWindow().run()
+    
