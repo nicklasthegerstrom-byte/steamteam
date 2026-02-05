@@ -262,5 +262,5 @@ class GameCache:
 
 
 if __name__ == "__main__":
-    create_tables()
+    create_tables(DB_PATH)
     print(f"✅ Database ready at {DB_PATH.resolve()}")
