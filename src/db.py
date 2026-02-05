@@ -4,18 +4,22 @@ from pathlib import Path
 from datetime import datetime
 from data.settings import SETTINGS
 from src.snapshots import Snapshot
+from services.logger import get_logger
 
 # Full path to sqlite3 file
 DB_PATH = SETTINGS.db_path
+log = get_logger(__name__)
 
 def get_connection(db_path: Path = DB_PATH) -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
+    log.debug("Opening database connection path=%s", db_path)
     conn = sqlite3.connect(db_path)
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn
 
 
 def create_tables_on_connection(conn: sqlite3.Connection) -> None:
+    log.debug("Ensuring database tables exist")
     """
     Skapar tabeller på en redan öppen connection.
     Skapad för pytest med :memory: eftersom databasen lever så länge conn lever.
@@ -54,6 +58,7 @@ def create_tables_on_connection(conn: sqlite3.Connection) -> None:
 
 
 def create_tables(db_path: Path) -> None:
+    log.debug("Creating tables path=%s", db_path) 
     """
     Skapar tabeller i en filbaserad db (normal drift).
     Öppnar conn -> skapar tabeller -> stänger conn.
@@ -61,6 +66,10 @@ def create_tables(db_path: Path) -> None:
     conn = sqlite3.connect(db_path)
     try:
         create_tables_on_connection(conn)
+        log.info("Database tables ensured path=%s", db_path)
+    except Exception:
+        log.exception("Error creating database tables path=%s", db_path)
+        raise
     finally:
         conn.close()
 
@@ -86,10 +95,12 @@ class UserDB:
             self.conn.commit()
 
             user_id = int(cur.lastrowid)
+            log.info("User inserted user_id=%s username=%s", user_id, username)
             #returnerar ett user_id (int)
             return user_id
 
         except sqlite3.IntegrityError as e:
+            log.warning("User insert constraint violation username=%s email=%s", username, email)
             msg = str(e).lower()
             if "users.email" in msg:
                 raise ValueError("Email already exists") from e
@@ -167,6 +178,7 @@ class SnapshotDB:
 
         #returnerar ett snapshot_id (int)
         snapshot_id = int(cur.lastrowid)
+        log.info("Snapshot inserted user_id=%s snapshot_id=%s", snapshot.user_id, snapshot_id)
         return snapshot_id
 
     def load_latest_snapshot(self, user_id: int) -> Snapshot | None:
@@ -258,7 +270,8 @@ class GameCache:
                 datetime.now().isoformat()
             )
         )
-        self.conn.commit()    
+        self.conn.commit()
+        log.debug("Game cached appid=%s name=%s", appid, name)    
 
 
 if __name__ == "__main__":

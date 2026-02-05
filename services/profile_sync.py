@@ -3,8 +3,12 @@ from src.snapshots import create_snapshot, Snapshot
 from api.steam_webapi import resolve_steam_id, fetch_owned_games
 from src.vectors import extract_games
 from data.store_cache import get_game
+from services.logger import get_logger
+
 
 __all__ = ["sync_user_profile"]
+log = get_logger(__name__)
+
 
 # ------------------ Internal helpers ------------------
 
@@ -46,6 +50,8 @@ def enrich_games(games: list[dict], top_n: int = 5) -> list[dict]:
 # ------------------ Public function ------------------
 
 def sync_user_profile(user_id: int, top_n: int = 5) -> Snapshot:
+    log.info("Profile sync started user_id=%s top_n=%s", user_id, top_n)
+    
     """
     Full profile sync:
     1. Resolve SteamID
@@ -55,32 +61,55 @@ def sync_user_profile(user_id: int, top_n: int = 5) -> Snapshot:
     5. Save snapshot to DB
     6. Return snapshot
     """
-    conn = get_connection()
-    user_db = UserDB(conn)
-    user = user_db.get_user(user_id=user_id)
-    steam_id = user.get("steam_id")
-    conn.close()
+    try:
+        conn = get_connection()
+        user_db = UserDB(conn)
     
-    steam_id: str = resolve_steam_id(steam_id)
-    games: list[dict] = fetch_owned_games(steam_id)
-    enriched_games: list[dict] = enrich_games(games, top_n)
+        user = user_db.get_user(user_id=user_id)
+    
+        if not user:
+            log.error("User not found user_id=%s", user_id)
+            raise ValueError(f"User {user_id} not found")
+    
+        steam_id = user.get("steam_id")
+    
+        if not steam_id:
+            log.error("User missing steam_id user_id=%s", user_id)
+            raise ValueError(f"User {user_id} has no steam_id")
 
-    steam_dict: dict = {
-        "steam_id": steam_id,
-        "game_count": len(enriched_games),
-        "games": enriched_games
-    }
+        conn.close()
+    
+        steam_id: str = resolve_steam_id(steam_id)
+        games: list[dict] = fetch_owned_games(steam_id)
+        log.info("Owned games fetched user_id=%s count=%d", user_id, len(games))
+        enriched_games: list[dict] = enrich_games(games, top_n)
 
-    extracted: dict = extract_games(steam_dict)
-    snapshot: Snapshot = create_snapshot(user_id, extracted)
+        steam_dict: dict = {
+            "steam_id": steam_id,
+            "game_count": len(enriched_games),
+            "games": enriched_games
+        }
 
-    conn = get_connection()
-    snapshot_db = SnapshotDB(conn)
-    snapshot_id: int = snapshot_db.insert_snapshot(snapshot)
-    conn.close()
+        extracted: dict = extract_games(steam_dict)
+        snapshot: Snapshot = create_snapshot(user_id, extracted)
 
-    print(f"user profile: {user_id} synced with snapshot_id: {snapshot_id}")
-    return snapshot
+        conn = get_connection()
+        snapshot_db = SnapshotDB(conn)
+        snapshot_id: int = snapshot_db.insert_snapshot(snapshot)
+        conn.close()
+        log.info("Profile sync complete user_id=%s snapshot_id=%s", user_id, snapshot_id)
+        print(f"user profile: {user_id} synced with snapshot_id: {snapshot_id}")
+        return snapshot
+    
+    except ValueError:
+        # expected/business validation errors (missing user, missing steam_id, etc.)
+        log.warning("Profile sync validation issue user_id=%s", user_id)
+        raise
+
+    except Exception:
+        # unexpected/runtime errors (network/db bugs, parsing crashes, etc.)
+        log.exception("Profile sync failed user_id=%s", user_id)
+        raise
 
 # ------------------ Manual testing ------------------
 
