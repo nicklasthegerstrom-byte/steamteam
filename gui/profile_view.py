@@ -1,48 +1,78 @@
 from tkinter import ttk
+from services.profile_sync import sync_user_profile
 
 
 class ProfileView:
-    def __init__(self, parent):
+    def __init__(self, parent, get_user_id_callback):
         self.frame = ttk.Frame(parent, style="Card.TFrame")
+        self.get_user_id = get_user_id_callback
 
-        ttk.Label(self.frame, text="Profile", style="CardTitle.TLabel").pack(anchor="w", padx=18, pady=(18, 6))
+        ttk.Label(self.frame, text="Profile", style="CardTitle.TLabel").pack(
+            anchor="w", padx=18, pady=(18, 6)
+        )
+
         ttk.Label(
             self.frame,
-            text="Manage your Steam profile (sync + export will be added later).",
-            style="CardText.TLabel"
+            text="Manage your Steam profile and sync data.",
+            style="CardText.TLabel",
         ).pack(anchor="w", padx=18, pady=(0, 14))
 
         actions = ttk.Frame(self.frame, style="Card.TFrame")
-        actions.pack(fill="x", padx=18, pady=(0, 18))
+        actions.pack(fill="x", padx=18, pady=(0, 10))
 
-        ttk.Button(actions, text="Connect Steam (soon)").pack(side="left", padx=(0, 10))
-        ttk.Button(actions, text="Update from Steam (soon)").pack(side="left", padx=(0, 10))
-        ttk.Button(actions, text="Export JSON (soon)").pack(side="left")
+        ttk.Button(
+            actions,
+            text="Sync Profile",
+            style="Primary.TButton",
+            command=self._sync_profile,
+        ).pack(side="left")
+
+        self.status_var = ttk.Label(
+            self.frame,
+            text="",
+            style="CardText.TLabel",
+        )
+        self.status_var.pack(anchor="w", padx=18, pady=(6, 12))
 
         ttk.Separator(self.frame).pack(fill="x", padx=18, pady=14)
 
-        ttk.Label(self.frame, text="Top games (preview)", style="CardTitle.TLabel").pack(
-            anchor="w", padx=18, pady=(0, 8)
-        )
+        ttk.Label(
+            self.frame,
+            text="Top games (after sync)",
+            style="CardTitle.TLabel",
+        ).pack(anchor="w", padx=18, pady=(0, 8))
 
-        box = ttk.Frame(self.frame, style="Card.TFrame")
-        box.pack(fill="x", padx=18, pady=(0, 18))
+        self.preview_box = ttk.Frame(self.frame, style="Card.TFrame")
+        self.preview_box.pack(fill="x", padx=18, pady=(0, 18))
 
-        for name in ["Game A", "Game B", "Game C", "Game D", "Game E"]:
-            ttk.Label(box, text=f"• {name}", style="CardText.TLabel").pack(anchor="w", pady=2)
+    def _sync_profile(self):
+        user_id = self.get_user_id()
+        if not user_id:
+            self.status_var.config(text="No user logged in.")
+            return
 
-        ttk.Label(self.frame, text="Tags (preview)", style="CardTitle.TLabel").pack(
-            anchor="w", padx=18, pady=(0, 8)
-        )
+        try:
+            snapshot = sync_user_profile(user_id, top_n=5)
+        except Exception as e:
+            self.status_var.config(text=f"Sync failed: {e}")
+            return
 
-        tags = ttk.Frame(self.frame, style="Card.TFrame")
-        tags.pack(fill="x", padx=18, pady=(0, 18))
+        self.status_var.config(text="Profile synced successfully.")
 
-        ttk.Label(tags, text="Action • Co-op • Competitive • Strategy • RPG", style="CardText.TLabel").pack(anchor="w")
+        for w in self.preview_box.winfo_children():
+            w.destroy()
+
+        for game in snapshot.top_games[:5]:
+            name = game["name"]
+            hours = round(game["playtime"] / 60)
+            ttk.Label(
+                self.preview_box,
+                text=f"• {name} ({hours}h)",
+                style="CardText.TLabel",
+            ).pack(anchor="w", pady=2)
 
     def show(self):
         self.frame.pack(fill="both", expand=True)
 
     def hide(self):
         self.frame.pack_forget()
-

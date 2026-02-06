@@ -1,6 +1,8 @@
 import tkinter as tk
 from tkinter import ttk
 
+from services.auth_service import login
+from services.matching_service import match_user_id
 from gui.register_view import RegisterView
 from gui.profile_view import ProfileView
 from gui.match_view import MatchView
@@ -19,12 +21,13 @@ class MainWindow:
         self.logo = tk.PhotoImage(file="assets/steamteam_logo_1.png")
 
         self.current_user = None
+        self.current_user_id = None
 
         # Root container
         self.container = ttk.Frame(self.root)
         self.container.pack(fill="both", expand=True)
 
-        # Start on login screen (visual only)
+        # Start on login screen
         self._build_login_screen()
 
     def run(self):
@@ -42,30 +45,24 @@ class MainWindow:
         self.active = "#1b1f2a"
 
         self.root.configure(bg=self.bg)
-
         style.configure(".", font=("Segoe UI", 11))
 
-        # Base frames
         style.configure("TFrame", background=self.bg)
         style.configure("Card.TFrame", background=self.card)
 
-        # Labels
         style.configure("Title.TLabel", background=self.bg, foreground=self.text, font=("Segoe UI", 22, "bold"))
         style.configure("Sub.TLabel", background=self.bg, foreground=self.subtext)
 
         style.configure("CardTitle.TLabel", background=self.card, foreground=self.text, font=("Segoe UI", 14, "bold"))
         style.configure("CardText.TLabel", background=self.card, foreground=self.subtext)
 
-        # Image label in card
         style.configure("CardImg.TLabel", background=self.card)
 
-        # Entry + buttons
         style.configure("TEntry", padding=8)
 
         style.configure("Primary.TButton", padding=10)
         style.map("Primary.TButton", background=[("active", "#3d66db")])
 
-        # Sidebar buttons
         style.configure("Nav.TButton", padding=10, anchor="w")
         style.map("Nav.TButton", background=[("active", "#222633")])
 
@@ -89,7 +86,7 @@ class MainWindow:
         ttk.Label(
             card,
             text="Enter a username or email to continue.",
-            style="CardText.TLabel"
+            style="CardText.TLabel",
         ).pack(anchor="w", padx=18, pady=(0, 14))
 
         form = ttk.Frame(card, style="Card.TFrame")
@@ -99,26 +96,45 @@ class MainWindow:
         self.username_var = tk.StringVar()
         ttk.Entry(form, textvariable=self.username_var).pack(fill="x")
 
+        self.login_error_var = tk.StringVar(value="")
+        ttk.Label(form, textvariable=self.login_error_var, style="CardText.TLabel").pack(anchor="w", pady=(8, 0))
+
         actions = ttk.Frame(card, style="Card.TFrame")
         actions.pack(fill="x", padx=18, pady=(0, 18))
 
         ttk.Button(
             actions,
-            text="Login (soon)",
+            text="Login",
             style="Primary.TButton",
-            command=self._enter_app_shell
+            command=self._enter_app_shell,
         ).pack(side="left", padx=(0, 10))
 
         ttk.Button(
             actions,
             text="Register user",
-            command=self._show_register
+            command=self._show_register,
         ).pack(side="left")
 
-
     def _enter_app_shell(self):
-        username = (self.username_var.get() or "").strip()
-        self.current_user = username if username else "guest"
+        identifier = (self.username_var.get() or "").strip()
+        self.login_error_var.set("")
+
+        if not identifier:
+            self.login_error_var.set("Enter a username or email.")
+            return
+
+        try:
+            user = login(identifier)
+        except Exception as e:
+            self.login_error_var.set(str(e))
+            return
+
+        if not user:
+            self.login_error_var.set("User not found. Please register.")
+            return
+
+        self.current_user_id = user["user_id"]
+        self.current_user = user["username"]
         self._build_app_shell()
 
     def _build_app_shell(self):
@@ -151,7 +167,7 @@ class MainWindow:
             sidebar,
             text="Profile",
             style="Nav.TButton",
-            command=lambda: self._show_page("profile")
+            command=lambda: self._show_page("profile"),
         )
         self.nav_buttons["profile"].pack(fill="x", padx=10, pady=4)
 
@@ -159,14 +175,14 @@ class MainWindow:
             sidebar,
             text="Match",
             style="Nav.TButton",
-            command=lambda: self._show_page("match")
+            command=lambda: self._show_page("match"),
         )
         self.nav_buttons["match"].pack(fill="x", padx=10, pady=4)
 
         ttk.Separator(sidebar).pack(fill="x", padx=10, pady=12)
         ttk.Button(sidebar, text="Logout", style="Nav.TButton", command=self._logout).pack(fill="x", padx=10, pady=4)
 
-        # Content (outer + inner för att den alltid ska synas tydligt)
+        # Content
         content_outer = ttk.Frame(body)
         content_outer.pack(side="right", fill="both", expand=True, padx=(16, 0))
 
@@ -175,31 +191,53 @@ class MainWindow:
 
         # Pages
         self.pages = {
-            "profile": ProfileView(self.content),
+            "profile": ProfileView(self.content, get_user_id_callback=lambda: self.current_user_id),
             "match": MatchView(self.content),
         }
+
+
         self._show_page("profile")
 
+    def _run_matching(self):
+        if self.current_user_id is None:
+            return
+        cards = match_user_id(self.current_user_id, top_n=5)
+        self.pages["match"].set_results(cards)
+
     def _show_page(self, key: str):
-        # Hide all pages
         for page in self.pages.values():
             page.hide()
 
-        # Reset nav button styles
         for btn in self.nav_buttons.values():
             btn.configure(style="Nav.TButton")
 
-        # Show selected page + mark active
         self.pages[key].show()
         self.nav_buttons[key].configure(style="NavActive.TButton")
 
+        if key == "match":
+            self._run_matching()
+
     def _logout(self):
         self.current_user = None
+        self.current_user_id = None
         self._build_login_screen()
 
     def _show_register(self):
         for w in self.container.winfo_children():
             w.destroy()
 
-        self.register_view = RegisterView(self.container, on_back=self._build_login_screen)
+        self.register_view = RegisterView(
+            self.container,
+            on_back=self._build_login_screen,
+            on_created=self._on_register_success,
+        )
         self.register_view.show()
+
+    def _on_register_success(self, user_id: int, username: str):
+        self.current_user_id = user_id
+        self.current_user = username
+        self._build_app_shell()
+
+
+if __name__ == "__main__":
+    MainWindow().run()
