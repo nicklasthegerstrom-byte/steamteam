@@ -71,7 +71,12 @@ def sync_user_profile(user_id: int, top_n: int = 5) -> Snapshot:
             log.error("User not found user_id=%s", user_id)
             raise ValueError(f"User {user_id} not found")
     
-        steam_id = user.get("steam_id")
+        steam_id_raw = user.get("steam_id")
+        if not isinstance(steam_id_raw, str) or not steam_id_raw.strip():
+            log.error("User missing steam_id user_id=%s", user_id)
+            raise ValueError(f"User {user_id} has no steam_id")
+        steam_id: str = steam_id_raw
+        steam_id = resolve_steam_id(steam_id)
     
         if not steam_id:
             log.error("User missing steam_id user_id=%s", user_id)
@@ -90,7 +95,7 @@ def sync_user_profile(user_id: int, top_n: int = 5) -> Snapshot:
             "games": enriched_games
         }
 
-        extracted: dict = extract_games(steam_dict)
+        extracted: list[dict] = extract_games(steam_dict)
         snapshot: Snapshot = create_snapshot(user_id, extracted)
 
         conn = get_connection()
