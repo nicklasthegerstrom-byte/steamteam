@@ -4,23 +4,40 @@ from src.db import get_connection, UserDB
 # =========================
 # Auth / Identity
 # =========================
-def login(username: str, email: str) -> dict | None:
-    if not username or not email:
+def login(identifier: str) -> dict | None:
+    if not identifier or not identifier.strip():
         return None
+
+    identifier = identifier.strip()
 
     with get_connection() as conn:
         user_db = UserDB(conn)
-        return user_db.get_user(username=username, email=email)
+
+        # If it looks like an email
+        if "@" in identifier:
+            return user_db.get_user(email=identifier)
+
+        # Otherwise treat as username
+        return user_db.get_user(username=identifier)
+
 
 
 def signup(username: str, email: str, steam_id: str) -> int:
     if not username or not email:
         raise ValueError("Username and email are required")
 
-    steam_id = resolve_steam_id(steam_id)
+    steam_id = (steam_id or "").strip()
+
+    if steam_id:
+        try:
+            steam_id = resolve_steam_id(steam_id)
+        except Exception:
+            pass
+
     with get_connection() as conn:
         user_db = UserDB(conn)
-        return user_db.insert_user(username=username, email=email, steam_id=steam_id)
+        return user_db.insert_user(username=username, email=email, steam_id=steam_id or None)
+
 
 
 def get_user_by_id(user_id: int) -> dict:
