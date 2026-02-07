@@ -116,7 +116,7 @@ def load_settings() -> Settings:
     steam_api_key = _env("STEAM_API_KEY")
 
     steam_webapi_base_url = _env("STEAM_WEBAPI_BASE_URL", "https://api.steampowered.com") or "https://api.steampowered.com"
-    steam_store_base_url  = _env("STEAM_STORE_BASE_URL",  "https://store.steampowered.com/api") or "https://store.steampowered.com/api"
+    steam_store_base_url = _env("STEAM_STORE_BASE_URL", "https://store.steampowered.com") or "https://store.steampowered.com"
 
     http_timeout_s = _env_float("STEAMTEAM_HTTP_TIMEOUT_S", 10.0)
     http_retries = _env_int("STEAMTEAM_HTTP_RETRIES", 3)
