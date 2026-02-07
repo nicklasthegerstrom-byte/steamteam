@@ -115,20 +115,14 @@ def load_settings() -> Settings:
 
     steam_api_key = _env("STEAM_API_KEY")
 
-    steam_webapi_base_url = _env(
-        "STEAM_WEBAPI_BASE_URL",
-        "https://api.steampowered.com",
-    )
-    steam_store_base_url = _env(
-        "STEAM_STORE_BASE_URL",
-        "https://store.steampowered.com",
-    )
+    steam_webapi_base_url = _env("STEAM_WEBAPI_BASE_URL", "https://api.steampowered.com") or "https://api.steampowered.com"
+    steam_store_base_url  = _env("STEAM_STORE_BASE_URL",  "https://store.steampowered.com/api") or "https://store.steampowered.com/api"
 
     http_timeout_s = _env_float("STEAMTEAM_HTTP_TIMEOUT_S", 10.0)
     http_retries = _env_int("STEAMTEAM_HTTP_RETRIES", 3)
     http_backoff_s = _env_float("STEAMTEAM_HTTP_BACKOFF_S", 0.5)
 
-    user_agent = _env("STEAMTEAM_USER_AGENT", f'{app_name}/{(_env("STEAMTEAM_VERSION") or "1.0")} (+school project)')
+    user_agent = _env("USER_AGENT", "SteamTeam/1.0") or "SteamTeam/1.0"
 
     store_request_delay_s = _env_float("STEAMTEAM_STORE_DELAY_S", 0.20)
     store_cache_ttl_s = _env_int("STEAMTEAM_STORE_CACHE_TTL_S", 60 * 60 * 24 * 7) # 7 days
