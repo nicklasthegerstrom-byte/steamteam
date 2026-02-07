@@ -116,11 +116,15 @@ def sync_user_profile(user_id: int, top_n: int = 5) -> tuple[Snapshot, SelfCard]
         if not user:
             log.error("User not found user_id=%s", user_id)
             raise ValueError(f"User {user_id} not found")
-
-        steam_id_from_db = user.get("steam_id")
-        username = user.get("username") or "Unknown"
-
-        if not steam_id_from_db:
+    
+        steam_id_raw = user.get("steam_id")
+        if not isinstance(steam_id_raw, str) or not steam_id_raw.strip():
+            log.error("User missing steam_id user_id=%s", user_id)
+            raise ValueError(f"User {user_id} has no steam_id")
+        steam_id: str = steam_id_raw
+        steam_id = resolve_steam_id(steam_id)
+    
+        if not steam_id:
             log.error("User missing steam_id user_id=%s", user_id)
             raise ValueError(f"User {user_id} has no steam_id")
 
@@ -143,13 +147,8 @@ def sync_user_profile(user_id: int, top_n: int = 5) -> tuple[Snapshot, SelfCard]
             "games": enriched_games,
         }
 
-        extracted = extract_games(steam_dict)
-        snapshot = create_snapshot(user_id, extracted)
-
-        # Save snapshot
-        with get_connection() as conn:
-            snapshot_db = SnapshotDB(conn)
-            snapshot_id = snapshot_db.insert_snapshot(snapshot)
+        extracted: list[dict] = extract_games(steam_dict)
+        snapshot: Snapshot = create_snapshot(user_id, extracted)
 
         log.info("Profile sync complete user_id=%s snapshot_id=%s", user_id, snapshot_id)
 
