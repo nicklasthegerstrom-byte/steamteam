@@ -46,12 +46,19 @@ class User:
         print(f"email: {self.email}")
         print(f"steam_id: {self.steam_id}")
 
-def print_framed(text: str, max_len: int = 40) -> None:
-    max_len = max_len if max_len >= 40 else 0
-    print("x"+("-"*(max_len-2))+"x")
-    print("|"+text.center(max_len-2, " ")+"|")
-    print("x"+("-"*(max_len-2))+"x")
-    print("")
+def print_framed(text: str, min_width: int = 40) -> None:
+    content_width = max(len(text), min_width - 2)
+    
+    if content_width % 2 != 0:
+        content_width += 1
+
+    width = content_width + 2
+
+    print("x" + "-" * content_width + "x")
+    print("|" + text.center(content_width) + "|")
+    print("x" + "-" * content_width + "x")
+    print()
+
 
 # =========================
 # Main window
