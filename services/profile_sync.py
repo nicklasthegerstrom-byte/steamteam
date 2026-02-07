@@ -1,13 +1,52 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import List, Tuple
+
 from src.db import get_connection, UserDB, SnapshotDB
 from src.snapshots import create_snapshot, Snapshot
 from api.steam_webapi import resolve_steam_id, fetch_owned_games
-from src.vectors import extract_games
+from src.vectors import extract_games, summarize_playstyle
 from data.store_cache import get_game
 from services.logger import get_logger
 
+__all__ = ["sync_user_profile", "SelfCard", "build_self_card"]
 
-__all__ = ["sync_user_profile"]
 log = get_logger(__name__)
+
+
+# ------------------ View profile info ------------------
+
+@dataclass(slots=True)
+class SelfCard:
+    username: str
+    steam_id: str | None
+    playstyles: dict[str, float]
+    top_genres: List[Tuple[str, float]]
+    top_games: List[Tuple[str, int]] 
+
+
+def build_self_card(snapshot: Snapshot, username: str, steam_id: str | None) -> SelfCard:
+    playstyles = summarize_playstyle(snapshot.category_vector)
+
+    top_genres = sorted(
+        snapshot.genre_vector.items(),
+        key=lambda x: x[1],
+        reverse=True
+    )[:3]
+
+    top_games = [
+        (g["name"], round(g["playtime"] / 60))
+        for g in (snapshot.top_games or [])[:3]
+    ]
+
+    return SelfCard(
+        username=username,
+        steam_id=steam_id,
+        playstyles=playstyles,
+        top_genres=top_genres,
+        top_games=top_games,
+    )
 
 
 # ------------------ Internal helpers ------------------
@@ -17,7 +56,12 @@ def enrich_games(games: list[dict], top_n: int = 5) -> list[dict]:
     Sort games by playtime and enrich each with Steam Store metadata (genres, categories).
     Returns a list of enriched game dicts.
     """
-    sorted_games = sorted(games, key=lambda g: g.get("playtime_forever", 0), reverse=True)[:top_n]
+    sorted_games = sorted(
+        games,
+        key=lambda g: g.get("playtime_forever", 0),
+        reverse=True
+    )[:top_n]
+
     enriched: list[dict] = []
 
     for g in sorted_games:
@@ -25,7 +69,6 @@ def enrich_games(games: list[dict], top_n: int = 5) -> list[dict]:
         game_data = get_game(appid)
 
         if not game_data:
-            # fallback if fetch failed
             enriched.append({
                 "appid": appid,
                 "name": "unknown",
@@ -47,67 +90,83 @@ def enrich_games(games: list[dict], top_n: int = 5) -> list[dict]:
 
     return enriched
 
+
 # ------------------ Public function ------------------
 
-def sync_user_profile(user_id: int, top_n: int = 5) -> Snapshot:
-    log.info("Profile sync started user_id=%s top_n=%s", user_id, top_n)
-    
+def sync_user_profile(user_id: int, top_n: int = 5) -> tuple[Snapshot, SelfCard]:
     """
     Full profile sync:
-    1. Resolve SteamID
-    2. Fetch owned games
-    3. Enrich games with store metadata
-    4. Create snapshot
-    5. Save snapshot to DB
-    6. Return snapshot
+    1. Fetch user from DB
+    2. Resolve SteamID
+    3. Fetch owned games
+    4. Enrich games with store metadata
+    5. Create snapshot
+    6. Save snapshot to DB
+    7. Build selfcard
+    8. Return snapshot + selfcard
     """
+    log.info("Profile sync started user_id=%s top_n=%s", user_id, top_n)
+
     try:
-        conn = get_connection()
-        user_db = UserDB(conn)
-    
-        user = user_db.get_user(user_id=user_id)
-    
+        # Fetch user + steam_id from DB
+        with get_connection() as conn:
+            user_db = UserDB(conn)
+            user = user_db.get_user(user_id=user_id)
+
         if not user:
             log.error("User not found user_id=%s", user_id)
             raise ValueError(f"User {user_id} not found")
-    
-        steam_id = user.get("steam_id")
-    
-        if not steam_id:
+
+        steam_id_from_db = user.get("steam_id")
+        username = user.get("username") or "Unknown"
+
+        if not steam_id_from_db:
             log.error("User missing steam_id user_id=%s", user_id)
             raise ValueError(f"User {user_id} has no steam_id")
 
-        conn.close()
-    
-        steam_id: str = resolve_steam_id(steam_id)
-        games: list[dict] = fetch_owned_games(steam_id)
-        log.info("Owned games fetched user_id=%s count=%d", user_id, len(games))
-        enriched_games: list[dict] = enrich_games(games, top_n)
+        # Resolve + fetch games
+        steam_id_resolved = resolve_steam_id(steam_id_from_db)
+        games = fetch_owned_games(steam_id_resolved)
 
-        steam_dict: dict = {
-            "steam_id": steam_id,
+        log.info(
+            "Owned games fetched user_id=%s steam_id=%s count=%d",
+            user_id,
+            steam_id_resolved,
+            len(games),
+        )
+
+        enriched_games = enrich_games(games, top_n)
+
+        steam_dict = {
+            "steam_id": steam_id_resolved,
             "game_count": len(enriched_games),
-            "games": enriched_games
+            "games": enriched_games,
         }
 
-        extracted: dict = extract_games(steam_dict)
-        snapshot: Snapshot = create_snapshot(user_id, extracted)
+        extracted = extract_games(steam_dict)
+        snapshot = create_snapshot(user_id, extracted)
 
-        conn = get_connection()
-        snapshot_db = SnapshotDB(conn)
-        snapshot_id: int = snapshot_db.insert_snapshot(snapshot)
-        conn.close()
+        # Save snapshot
+        with get_connection() as conn:
+            snapshot_db = SnapshotDB(conn)
+            snapshot_id = snapshot_db.insert_snapshot(snapshot)
+
         log.info("Profile sync complete user_id=%s snapshot_id=%s", user_id, snapshot_id)
-        print(f"user profile: {user_id} synced with snapshot_id: {snapshot_id}")
-        return snapshot
-    
+
+        # Build selfcard (username + steam_id from DB)
+        selfcard = build_self_card(
+            snapshot,
+            username=username,
+            steam_id=steam_id_from_db,
+        )
+
+        return snapshot, selfcard
+
     except ValueError:
-        # expected/business validation errors (missing user, missing steam_id, etc.)
         log.warning("Profile sync validation issue user_id=%s", user_id)
         raise
 
     except Exception:
-        # unexpected/runtime errors (network/db bugs, parsing crashes, etc.)
         log.exception("Profile sync failed user_id=%s", user_id)
         raise
 
