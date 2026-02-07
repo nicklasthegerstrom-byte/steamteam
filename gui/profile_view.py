@@ -62,6 +62,41 @@ class ProfileView:
         for w in self.preview_box.winfo_children():
             w.destroy()
 
+        # --- Playstyles ---
+        ttk.Label(
+        self.preview_box,
+        text="Playstyles",
+        style="CardTitle.TLabel",
+        ).pack(anchor="w", pady=(0, 4))
+
+        for style_name, score in selfcard.playstyles.items():
+            ttk.Label(
+                self.preview_box,
+                text=f"• {style_name}: {int(score * 100)}%",
+                style="CardText.TLabel",
+            ).pack(anchor="w", pady=1)
+            
+        # --- Top genres ---
+        ttk.Label(
+        self.preview_box,
+        text="Top genres",
+        style="CardTitle.TLabel",
+        ).pack(anchor="w", pady=(10, 4))
+
+        for genre_name, weight in selfcard.top_genres[:5]:
+            ttk.Label(
+                self.preview_box,
+                text=f"• {genre_name}: {int(weight * 100)}%",
+                style="CardText.TLabel",
+            ).pack(anchor="w", pady=1)
+        
+        # --- Top games ---
+        ttk.Label(
+        self.preview_box,
+        text="Top games",
+        style="CardTitle.TLabel",
+        ).pack(anchor="w", pady=(10, 4))
+
         for game in snapshot.top_games[:5]:
             name = game["name"]
             hours = round(game["playtime"] / 60)
