@@ -108,7 +108,7 @@ def sync_user_profile(user_id: int, top_n: int = 5) -> tuple[Snapshot, SelfCard]
     log.info("Profile sync started user_id=%s top_n=%s", user_id, top_n)
 
     try:
-        # Fetch user + steam_id from DB
+        #  Fetch user from DB
         with get_connection() as conn:
             user_db = UserDB(conn)
             user = user_db.get_user(user_id=user_id)
@@ -116,47 +116,50 @@ def sync_user_profile(user_id: int, top_n: int = 5) -> tuple[Snapshot, SelfCard]
         if not user:
             log.error("User not found user_id=%s", user_id)
             raise ValueError(f"User {user_id} not found")
-    
-        steam_id_raw = user.get("steam_id")
-        if not isinstance(steam_id_raw, str) or not steam_id_raw.strip():
+
+        steam_id = user.get("steam_id")
+        username = user.get("username") or "Unknown"
+
+        if not isinstance(steam_id, str) or not steam_id.strip():
             log.error("User missing steam_id user_id=%s", user_id)
             raise ValueError(f"User {user_id} has no steam_id")
-        steam_id: str = steam_id_raw
+
         steam_id = resolve_steam_id(steam_id)
-    
-        if not steam_id:
-            log.error("User missing steam_id user_id=%s", user_id)
-            raise ValueError(f"User {user_id} has no steam_id")
 
-        # Resolve + fetch games
-        steam_id_resolved = resolve_steam_id(steam_id_from_db)
-        games = fetch_owned_games(steam_id_resolved)
-
+        # Fetch owned games
+        games = fetch_owned_games(steam_id)
         log.info(
             "Owned games fetched user_id=%s steam_id=%s count=%d",
             user_id,
-            steam_id_resolved,
+            steam_id,
             len(games),
         )
 
+        # Enrich games
         enriched_games = enrich_games(games, top_n)
 
         steam_dict = {
-            "steam_id": steam_id_resolved,
+            "steam_id": steam_id,
             "game_count": len(enriched_games),
             "games": enriched_games,
         }
 
-        extracted: list[dict] = extract_games(steam_dict)
-        snapshot: Snapshot = create_snapshot(user_id, extracted)
+        # Create snapshot
+        extracted = extract_games(steam_dict)
+        snapshot = create_snapshot(user_id, extracted)
+
+        # Save snapshot
+        with get_connection() as conn:
+            snapshot_db = SnapshotDB(conn)
+            snapshot_id = snapshot_db.insert_snapshot(snapshot)
 
         log.info("Profile sync complete user_id=%s snapshot_id=%s", user_id, snapshot_id)
 
-        # Build selfcard (username + steam_id from DB)
+        # Build selfcard
         selfcard = build_self_card(
             snapshot,
             username=username,
-            steam_id=steam_id_from_db,
+            steam_id=steam_id,
         )
 
         return snapshot, selfcard
@@ -168,7 +171,6 @@ def sync_user_profile(user_id: int, top_n: int = 5) -> tuple[Snapshot, SelfCard]
     except Exception:
         log.exception("Profile sync failed user_id=%s", user_id)
         raise
-
 # ------------------ Manual testing ------------------
 
 if __name__ == "__main__":
