@@ -190,7 +190,7 @@ if __name__ == "__main__":
         exit(1)
 
     print(f"\nSyncing profile for user_id={user_id_input}, top_n={top_n_input}...\n")
-    snapshot = sync_user_profile(user_id_input, top_n_input)
+    snapshot, selfcard = sync_user_profile(user_id_input, top_n_input)
 
     print("\n=== Snapshot object ===")
     print(snapshot)

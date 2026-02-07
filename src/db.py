@@ -94,23 +94,26 @@ class UserDB:
             )
             self.conn.commit()
 
-            user_id = int(cur.lastrowid)
+            last_id = cur.lastrowid
+            if last_id is None:
+                raise RuntimeError("Insert succeeded but no lastrowid was returned")
+
+            user_id = int(last_id)
             log.info("User inserted user_id=%s username=%s", user_id, username)
-            #returnerar ett user_id (int)
             return user_id
 
         except sqlite3.IntegrityError as e:
             log.warning("User insert constraint violation username=%s email=%s", username, email)
             msg = str(e).lower()
-            if "users.email" in msg:
+            if "users.email" in msg or "email" in msg:
                 raise ValueError("Email already exists") from e
-            if "users.username" in msg:
+            if "users.username" in msg or "username" in msg:
                 raise ValueError("Username already exists") from e
-            if "users.steam_id" in msg:
+            if "users.steam_id" in msg or "steam_id" in msg:
                 raise ValueError("Steam ID already exists") from e
             raise ValueError("User violates database constraints") from e
 
-    #Funktion för att hämta användardata med EMAIL och/eller USERNAME.
+    # Funktion för att hämta användardata med EMAIL och/eller USERNAME och/eller USER_ID.
     def get_user(
         self,
         *,
@@ -129,7 +132,7 @@ class UserDB:
         """
         params: list[object] = []
 
-        #För att funktionen ska funka med email, ELLER usernamn, ELLER båda två!
+        # För att funktionen ska funka med email, ELLER username, ELLER user_id, ELLER kombination.
         if email is not None:
             query += " AND email = ?"
             params.append(email)
@@ -156,6 +159,75 @@ class UserDB:
             "created_at": row[4],
         }
 
+    def update_email(self, user_id: int, new_email: str) -> None:
+        try:
+            cur = self.conn.execute(
+                """
+                UPDATE users
+                SET email = ?
+                WHERE user_id = ?
+                """,
+                (new_email, user_id),
+            )
+            self.conn.commit()
+
+            if cur.rowcount == 0:
+                raise ValueError(f"User {user_id} not found")
+
+            log.info("User email updated user_id=%s", user_id)
+
+        except sqlite3.IntegrityError as e:
+            msg = str(e).lower()
+            if "users.email" in msg or "email" in msg:
+                raise ValueError("Email already exists") from e
+            raise ValueError("Email violates database constraints") from e
+
+    def update_username(self, user_id: int, new_username: str) -> None:
+        try:
+            cur = self.conn.execute(
+                """
+                UPDATE users
+                SET username = ?
+                WHERE user_id = ?
+                """,
+                (new_username, user_id),
+            )
+            self.conn.commit()
+
+            if cur.rowcount == 0:
+                raise ValueError(f"User {user_id} not found")
+
+            log.info("Username updated user_id=%s", user_id)
+
+        except sqlite3.IntegrityError as e:
+            msg = str(e).lower()
+            if "users.username" in msg or "username" in msg:
+                raise ValueError("Username already exists") from e
+            raise ValueError("Username violates database constraints") from e
+
+    def update_steam_id(self, user_id: int, new_steam_id: str) -> None:
+        try:
+            cur = self.conn.execute(
+                """
+                UPDATE users
+                SET steam_id = ?
+                WHERE user_id = ?
+                """,
+                (new_steam_id, user_id),
+            )
+            self.conn.commit()
+
+            if cur.rowcount == 0:
+                raise ValueError(f"User {user_id} not found")
+
+            log.info("Steam ID updated user_id=%s", user_id)
+
+        except sqlite3.IntegrityError as e:
+            msg = str(e).lower()
+            if "users.steam_id" in msg or "steam_id" in msg:
+                raise ValueError("Steam ID already exists") from e
+            raise ValueError("Steam ID violates database constraints") from e
+
     #Förslag? update_user_steam_id(user_id: int)
 
 #Klass med funktioner för snapshotfunktioner
@@ -177,9 +249,14 @@ class SnapshotDB:
         self.conn.commit()
 
         #returnerar ett snapshot_id (int)
-        snapshot_id = int(cur.lastrowid)
+        last_id = cur.lastrowid
+        if last_id is None:
+            raise RuntimeError("Insert snapshot succeeded but no lastrowid was returned")
+
+        snapshot_id = int(last_id)
         log.info("Snapshot inserted user_id=%s snapshot_id=%s", snapshot.user_id, snapshot_id)
         return snapshot_id
+
 
     def load_latest_snapshot(self, user_id: int) -> Snapshot | None:
         cur = self.conn.execute(
