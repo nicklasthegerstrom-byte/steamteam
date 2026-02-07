@@ -10,6 +10,7 @@ from services.auth_service import (
 )
 from services.profile_sync import sync_user_profile
 from services.matching_service import match_user_id
+from typing import Any
 
 # =========================
 # User class
@@ -20,9 +21,9 @@ class User:
         self.username = username
         self.email = email
         self.steam_id = steam_id
-        self.snapshot = None
-        self.selfcard = None
-        self.matchcards = None
+        self.snapshot: Any | None = None
+        self.selfcard: Any | None = None
+        self.matchcards: list[Any] | None = None
 
     def set_steam_id(self, steam_id: str):
         update_steam_id(self.user_id, steam_id)
@@ -57,34 +58,35 @@ class User:
         print(self.snapshot)
         print("")
         
-    def print_selfcard(self):
-        print("--- Selfcard ---")
+    def print_selfcard(self) -> None:
+        card = self.selfcard
+        if card is None:
+            print("[!] No self card loaded. Sync profile first.")
+            return
+
+        print(f"Username: {card.username}")
+        print(f"SteamID: {card.steam_id}")
+        print(f"Playstyles: {', '.join([f'{k}:{int(v*100)}%' for k, v in card.playstyles.items()])}")
+        print(f"Top Genres: {', '.join([f'{a}:{int(b*100)}%' for a, b in card.top_genres])}")
+        print(f"Top Games: {', '.join([f'{a}:{b}h' for a, b in card.top_games])}")
         
-        w = '"'
-        
-        print(f"Username: {self.selfcard.username}")
-        print(f"SteamID: {self.selfcard.steam_id}")
-        
-        print(f"Playstyles: {', '.join([f'{w}{k}{w}: {int(v*100)}' for k, v in self.selfcard.playstyles.items()])}")
-        print(f"Top Genres: {', '.join([f'{w}{a}{w}: {int(b*100)}' for a, b in self.selfcard.top_genres])}")
-        print(f"Top Games: {', '.join([f'{w}{a}{w}: {b}h' for a, b in self.selfcard.top_games])}")
-        
-    def print_matchcards(self):
-        print("Best matches:")
-        
-        w = '"'
-        
-        for i, match in enumerate(self.matchcards):
-            print("-"*40)
+    def print_matchcards(self) -> None:
+        cards = self.matchcards
+        if not cards:
+            print("[!] No matches loaded. Run matching first.")
+            return
+
+        print("Best matches:\n")
+        for i, match in enumerate(cards):
+            print("-" * 40)
             print(f"Match: {i+1}")
-            print(f"Username: {w}{match.username}{w}")
-            print(f"Steam: {w}https://steamcommunity.com/profiles/{match.steam_id}/{w}")
+            print(f"Username: {match.username}")
+            print(f"Steam: https://steamcommunity.com/profiles/{match.steam_id}/")
             print(f"Score: {match.score:.2%}")
-            print(f"Playstyles: {', '.join([f'{w}{k}{w}: {int(v*100)}' for k, v in match.playstyles.items()])}")
-            print(f"Top Genres: {', '.join([f'{w}{a}{w}: {int(b*100)}' for a, b in match.top_genres])}")
-            print(f"Top Games: {', '.join([f'{w}{a}{w}: {b}h' for a, b in match.top_games])}")
-        
-        print("")
+            print(f"Playstyles: {', '.join([f'{k}:{int(v*100)}%' for k, v in match.playstyles.items()])}")
+            print(f"Top Genres: {', '.join([f'{a}:{int(b*100)}%' for a, b in match.top_genres])}")
+            print(f"Top Games: {', '.join([f'{a}:{b}h' for a, b in match.top_games])}")
+            print("")
 
 def print_framed(text: str, min_width: int = 40) -> None:
     content_width = max(len(text), min_width - 2)

@@ -133,7 +133,7 @@ def match_snapshot_to_all(target_snapshot: Snapshot, top_n: int = 5) -> list[Mat
     return match_cards
 
 
-def match_user_id(user_id: int, top_n: int = 5) -> list[dict]:
+def match_user_id(user_id: int, top_n: int = 5) -> list[MatchCard]:
     """
     Fetch a snapshot by user_id and match it against all other users.
     """

@@ -52,7 +52,7 @@ class ProfileView:
             return
 
         try:
-            snapshot = sync_user_profile(user_id, top_n=5)
+            snapshot, selfcard = sync_user_profile(user_id, top_n=5)
         except Exception as e:
             self.status_var.config(text=f"Sync failed: {e}")
             return
