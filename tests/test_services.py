@@ -181,8 +181,8 @@ def test_full_flow(test_environment):
     assert cache.get_game(1337) is None
     
     # Sync user accounts
-    snapshot_1 = sync_user_profile(user_id=user_id_1)
-    snapshot_2 = sync_user_profile(user_id=user_id_2)
+    snapshot_1, selfcard_1 = sync_user_profile(user_id=user_id_1)
+    snapshot_2, selfcard_2 = sync_user_profile(user_id=user_id_2)
     
     # Game should be in cache because we synced users
     cached_game = cache.get_game(1337)
@@ -191,6 +191,9 @@ def test_full_flow(test_environment):
     
     # Verify snapshots
     assert snapshot_1.user_id == user_id_1 and snapshot_2.user_id == user_id_2
+    
+    # Verify selfcards
+    assert selfcard_1.username == "username_1" and selfcard_2.username == "username_2"
     
     # Perform matching
     matches_1 = match_user_id(snapshot_1.user_id)
