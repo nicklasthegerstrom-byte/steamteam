@@ -1,110 +1,172 @@
-![SteamTeam](steamteam-logo.png)
+![SteamTeam](assets/steamteam_logo_1.png)
 
-Find your dreamteam (on Steam)
+Find your dream team (on Steam).
 
 ---
 
 ## 🎮 What is Steamteam?
 
-Steamteam is an application that helps players discover other users with similar gaming preferences.
+Steamteam helps players discover other users with similar gaming preferences.
 
 Instead of relying on friend lists or manual searching, Steamteam analyzes:
 - played games
 - genres
 - playtime distribution
 
-and matches users using **vector-based similarity**.
+and match users using vector-based similarity.
 
-The goal is to make it easier to find like-minded gamers and potential gaming partners in a data-driven way.
-
----
-
-## 🧠 How it works (high level)
-
-1. A user connects their Steam account  
-2. Steam game data is fetched via the Steam Web API  
-3. The data is transformed into **weighted vectors**  
-4. A **snapshot** of the user profile is created  
-5. Users are matched by comparing snapshots using similarity algorithms  
-
-The matching logic does **not** use raw Steam data directly – it only works on snapshots.
+The goal is to make it easier to find like-minded gamers in a data-driven and testable way.
 
 ---
 
-## 📸 What is a Snapshot?
+## 🧠 How it works (overview)
 
-A **snapshot** is a compact, comparable representation of a user’s gaming profile at a specific moment in time.
+1. Steam game data is fetched via the Steam Web API
+2. The data is transformed into weighted vectors
+3. A snapshot of the user profile is created
+4. Users are matched by comparing snapshots
+
+Matching never operates directly on raw Steam data — only on snapshots.
+
+---
+
+## 📸 Snapshots
+
+A snapshot is a compact representation of a user’s gaming profile at a specific moment in time.
 
 Each snapshot contains:
-- `user_id` – internal Steamteam user ID  
-- `created_at` – timestamp  
-- `game_vector` – weighted game IDs  
-- `genre_vector` – weighted genres  
+- user ID
+- timestamp
+- weighted game vector
+- weighted genre vector
+- weighted category vector
+- 3 most played games
 
-Snapshots can be:
-- printed (for debugging and testing)  
-- saved as JSON  
-- stored in the database  
-- compared efficiently during matching  
-
-This separation keeps matching fast, stable, and reproducible.
+Snapshots can be stored, printed, exported as JSON, and compared efficiently.
+This keeps matching fast, stable, and reproducible.
 
 ---
 
 ## 🧮 Matching logic
 
-Users are matched using **cosine similarity** on vectors.
+Users are matched using cosine similarity on vectors.
 
 Three signals are combined:
-- **Genre similarity** (primary signal)  
-- **Game similarity** (secondary signal)  
-- **Category similarity** (third playstyle signal) 
+- Genre similarity (primary)
+- Game similarity (secondary)
+- Category / playstyle similarity
 
-Each user is compared against others, producing a match score between `0.0` and `1.0`.
-
-Higher score = more similar gaming preferences.
+Each comparison produces a score between 0.0 and 1.0.
 
 ---
 
-## 🗄️ Database design
+## 🗄️ Database
 
-Steamteam uses **SQLite** for simplicity and portability.
+Steamteam uses SQLite for simplicity and portability.
 
-The database contains three main tables:
-
-### users
-Stores Steamteam users (not Steam accounts).
-
-### snapshots
-Stores serialized snapshot data used for matching.
-
-### games_cache
-Caches Steam Store metadata (genres, categories) to reduce API calls and support future GUI features.
+The database contains three tables:
+- users
+- snapshots
+- games_cache
 
 Snapshots are stored as JSON blobs to keep the vector format flexible and version-safe.
 
 ---
 
+## 🧪 Testing without real users (important)
+
+To test the system without registering real users or using the Steam API, the project includes the script:
+
+scripts/seed_fake_accounts.py
+
+What it does:
+- creates a local SQLite database
+- creates all core tables
+- inserts fake users with predefined snapshots
+
+This allows immediate testing of matching logic, similarity scores, and UI behavior.
+No Steam account or API key is required.
+Just login as one of the fake accounts. BUT: Profile sync will not work without API key.
+
+How to run:
+From the project root (with venv activated):
+python scripts/seed_fake_accounts.py
+
+---
+
 ## 🖥️ Features
 
-- User account system  
-- Steam Web API integration  
-- Snapshot-based matching  
-- Vector similarity algorithms  
-- SQLite database persistence  
-- Graphical user interface (WIP)  
+- Steam Web API integration
+- Snapshot-based user matching
+- Vector similarity algorithms
+- SQLite database persistence
+- Graphical user interface (Tkinter)
 
 ---
 
 ## ⚙️ Requirements
 
-- Python 3  
-- Steam account  
-- Steam Web API key  
-- Internet connection  
+- Python 3
+- Internet connection (only required for Steam API usage)
+- Steam account (optional)
+- Steam Web API key (optional)
 
 ---
 
 ## 🚀 Running the application
 
-1. Clone the repository  
+git clone https://github.com/nicklasthegerstrom-byte/steamteam.git
+cd steamteam
+python -m venv venv
+
+Activate venv:
+
+Windows:
+venv\Scripts\activate
+
+MacOS / Linux:
+source venv/bin/activate
+
+Install dependencies:
+pip install -r requirements.txt
+
+(Optional) Add Steam API key in .env:
+STEAM_API_KEY=your_api_key_here
+
+Run the app:
+python app.pyw
+
+---
+
+## 👥 Contributors & Responsibilities
+
+Constantine:
+- Project structure
+- Settings
+- Models (core classes)
+- Logger
+
+Even:
+- Graphical user interface
+
+Nick:
+- Vector logic
+- Database setup and functions
+- Matchcard / Selfcard (Snapshot vizualisation)
+
+Erik:
+- Steam API functions
+- seed_fake_accounts script
+- Master testing
+
+Adam:
+- Matching logic and similarity algorithms
+
+---
+
+## 🛠️ Development workflow (contributors)
+
+- Development is done on feature branches from dev/main
+- No direct commits to dev
+- All changes are merged via Pull Requests
+- Branch names should be clear and descriptive
