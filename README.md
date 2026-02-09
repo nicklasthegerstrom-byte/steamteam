@@ -143,7 +143,7 @@ MacOS / Linux:
 Install dependencies:  
 `pip install -r requirements.txt`
 
-(Optional) Add Steam API key in .env:  
+(For real profile syncs) Add Steam API key in .env (in project root):  
 `STEAM_API_KEY=your_api_key_here`
 
 ### 🖥️ GUI (Tkinter)
@@ -177,7 +177,7 @@ Even - [evenhadeghe](https://github.com/evenhadeghe):
 - Graphical user interface
 
 Nick - [nicklasthegerstrom-byte](https://github.com/nicklasthegerstrom-byte):
-- Vector logic
+- Vectors / Snapshots
 - Database setup and functions
 - Matchcard / Selfcard (Snapshot vizualisation)
 
