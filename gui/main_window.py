@@ -7,6 +7,46 @@ from gui.register_view import RegisterView
 from gui.profile_view import ProfileView
 from gui.match_view import MatchView
 
+class ScrollableFrame(ttk.Frame):
+    def __init__(self, parent, *, style="TFrame"):
+        super().__init__(parent, style=style)
+
+        self.canvas = tk.Canvas(self, highlightthickness=0, bd=0)
+        self.v_scroll = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+        self.canvas.configure(yscrollcommand=self.v_scroll.set)
+
+        self.v_scroll.pack(side="right", fill="y")
+        self.canvas.pack(side="left", fill="both", expand=True)
+
+        self.inner = ttk.Frame(self.canvas, style=style)
+        self.window_id = self.canvas.create_window((0, 0), window=self.inner, anchor="nw")
+
+        self.inner.bind("<Configure>", self._on_frame_configure)
+        self.canvas.bind("<Configure>", self._on_canvas_configure)
+
+        # Mouse wheel (macOS + Windows/Linux)
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)      # Win/mac
+        self.canvas.bind_all("<Button-4>", self._on_mousewheel_linux)  # Linux up
+        self.canvas.bind_all("<Button-5>", self._on_mousewheel_linux)  # Linux down
+
+    def _on_frame_configure(self, _event=None):
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def _on_canvas_configure(self, event):
+        self.canvas.itemconfigure(self.window_id, width=event.width)
+
+    def _on_mousewheel(self, event):
+        # macOS: event.delta is small, Windows: 120 steps
+        delta = event.delta
+        if delta == 0:
+            return
+        step = -1 if delta > 0 else 1
+        self.canvas.yview_scroll(step, "units")
+
+    def _on_mousewheel_linux(self, event):
+        step = -1 if event.num == 4 else 1
+        self.canvas.yview_scroll(step, "units")
+
 
 class MainWindow:
     def __init__(self):
@@ -72,8 +112,12 @@ class MainWindow:
         for w in self.container.winfo_children():
             w.destroy()
 
-        wrapper = ttk.Frame(self.container)
-        wrapper.pack(fill="both", expand=True, padx=30, pady=30)
+        wrapper_sf = ScrollableFrame(self.container, style="TFrame")
+        wrapper_sf.pack(fill="both", expand=True)
+
+        wrapper = wrapper_sf.inner
+        wrapper.configure(padding=(30, 30))
+
 
         ttk.Label(wrapper, text="SteamTeam", style="Title.TLabel").pack(anchor="w")
 
