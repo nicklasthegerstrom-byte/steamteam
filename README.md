@@ -49,14 +49,26 @@ This keeps matching fast, stable, and reproducible.
 
 ## 🧮 Matching logic
 
-Users are matched using cosine similarity on vectors.
+SteamTeam matches users by comparing vector representations of their Steam profiles using **cosine similarity**.
 
-Three signals are combined:
-- Genre similarity (primary)
-- Game similarity (secondary)
-- Category / playstyle similarity
+The final match score is built from three signals:
 
-Each comparison produces a score between 0.0 and 1.0.
+- **Games** (50%)  
+  Shared games and relative playtime have the strongest influence on matching.
+
+- **Playstyle / Categories** (30%)  
+  Preferences such as PvP, Co-op, Social, and Solo play.
+
+- **Genres** *(20%)*  
+  High-level genre tendencies (e.g. Action, Strategy, RPG).
+
+Each signal produces a score between **0.0** and **1.0**.  
+
+The weighted sum of these signals forms the final match score:
+
+score = (0.5 × game_similarity) + (0.3 × playstyle_similarity) + (0.2 × genre_similarity)
+
+This weighting prioritizes *actual gameplay overlap* while still accounting for broader preferences.
 
 ---
 
@@ -114,59 +126,75 @@ python scripts/seed_fake_accounts.py
 ---
 
 ## 🚀 Running the application
-
+Clone repository and create virtual environment:  
+```
 git clone https://github.com/nicklasthegerstrom-byte/steamteam.git
 cd steamteam
 python -m venv venv
-
+```
 Activate venv:
 
-Windows:
-venv\Scripts\activate
+Windows:  
+`venv\Scripts\activate`
 
-MacOS / Linux:
-source venv/bin/activate
+MacOS / Linux:  
+`source venv/bin/activate`
 
-Install dependencies:
-pip install -r requirements.txt
+Install dependencies:  
+`pip install -r requirements.txt`
 
-(Optional) Add Steam API key in .env:
-STEAM_API_KEY=your_api_key_here
+(For real profile syncs) Add Steam API key in .env (in project root):  
+`STEAM_API_KEY=your_api_key_here`
 
-Run the app:
-python app.pyw
+### 🖥️ GUI (Tkinter)
+
+Run the graphical interface:
+
+`python app.pyw`
+
+
+---
+
+### 💻 CLI
+
+Run the command-line version:
+
+`python app-cli.py`
+
+The CLI lets you log in/register, sync your Steam profile, and find matches directly in the terminal.
 
 ---
 
 ## 👥 Contributors & Responsibilities
 
-Constantine:
+Constantine - [AeolianOpus](https://github.com/AeolianOpus):
 - Project structure
-- Settings
+- Settings / Bootstrap
 - Models (core classes)
 - Logger
 
-Even:
+Even - [evenhadeghe](https://github.com/evenhadeghe):
 - Graphical user interface
 
-Nick:
-- Vector logic
+Nick - [nicklasthegerstrom-byte](https://github.com/nicklasthegerstrom-byte):
+- Vectors / Snapshots
 - Database setup and functions
 - Matchcard / Selfcard (Snapshot vizualisation)
 
-Erik:
+Erik - [ErikCoderMan](https://github.com/ErikCoderMan):
 - Steam API functions
 - seed_fake_accounts script
 - Master testing
+- CLI interface
 
-Adam:
+Adam - [adamwelday](https://github.com/adamwelday):
 - Matching logic and similarity algorithms
 
 ---
 
-## 🛠️ Development workflow (contributors)
+## 🛠️ Development workflow and rules
 
 - Development is done on feature branches from dev/main
 - No direct commits to dev
-- All changes are merged via Pull Requests
+- All changes are merged via Pull Requests and checked by second team member
 - Branch names should be clear and descriptive
