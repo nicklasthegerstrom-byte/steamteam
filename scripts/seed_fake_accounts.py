@@ -11,6 +11,9 @@ This script is meant to be:
 import json
 import random
 from pathlib import Path
+from time import perf_counter
+from data.settings import SETTINGS
+
 
 # ==========================================================
 # CONFIG
@@ -18,12 +21,15 @@ from pathlib import Path
 
 SEED = 42
 NUM_USERS = 100
-MIN_GAMES_PER_USER = 3
+MIN_GAMES_PER_USER = 5
 MAX_GAMES_PER_USER = 20
+PT_LOW = 0
+PT_HIGH = 600_000
+PT2_LOW = 60
+PT2_HIGH = 10_000
 
-random.seed(SEED)
+GAME_DATA_FILE = SETTINGS.example_steam_games_path
 
-GAME_DATA_FILE = Path(__file__).resolve().parents[1] / "data" / "example_steam_games.json"
 
 # ==========================================================
 # APP IMPORTS
@@ -31,8 +37,7 @@ GAME_DATA_FILE = Path(__file__).resolve().parents[1] / "data" / "example_steam_g
 
 from src.snapshots import create_snapshot
 from src.vectors import extract_games
-
-# DB functions
+from src.utils import progress_bar
 from src.db import create_tables, get_connection, UserDB, SnapshotDB
 
 
@@ -55,127 +60,168 @@ def load_store_games() -> list[dict]:
 # ==========================================================
 
 ADJECTIVES = [
-    "cool", "sleepy", "angry", "happy", "fast",
-    "epic", "calm", "smart", "slow", "crazy"
+    "cool", "sleepy", "angry", "happy", "fast", "epic", "calm", "smart", "slow", "crazy",
+    "fierce", "shy", "brave", "bold", "sneaky", "witty", "lucky", "grumpy", "silly", "mighty",
+    "fiery", "mysterious", "jolly", "curious", "cheerful", "dark", "bright", "gentle", "proud",
+    "wild", "silent", "stormy", "frozen", "fiendish", "playful", "swift", "tiny", "huge", "ancient",
+    "vicious", "honest", "lively", "savage", "daring", "fancy", "zany"
 ]
 
 NOUNS = [
-    "gamer", "wizard", "ninja", "knight",
-    "noob", "pro", "coder"
+    "gamer", "wizard", "ninja", "knight", "noob", "pro", "coder", "hunter", "warrior", "mage",
+    "archer", "rogue", "assassin", "paladin", "sorcerer", "ranger", "thief", "champion", "samurai", "gladiator",
+    "knightmare", "warlock", "guardian", "sentinel", "dragon", "beast", "hero", "villain", "phantom", "cyborg",
+    "robot", "pirate", "monk", "jester", "viking", "druid", "bard", "swordsman", "goblin",
+    "troll", "giant", "elf", "orc", "sprite", "witch", "vampire", "zombie", "shadow", "noble", "hacker"
 ]
-
 
 def generate_fake_username(user_index: int) -> str:
     return f"fake_{random.choice(ADJECTIVES)}_{random.choice(NOUNS)}_{user_index}"
 
-
-def generate_playtime_minutes() -> int:
-    # up to 10k hours
-    return random.randint(0, 600_000)
-
-
-def generate_playtime_2weeks() -> int:
-    # sometimes zero
-    return random.choice([0, random.randint(60, 10_000)])
-
-
-def generate_fake_owned_games(store_games: list[dict]) -> list[dict]:
-    game_count = random.randint(MIN_GAMES_PER_USER, min(MAX_GAMES_PER_USER, len(store_games)))
+def generate_fake_steam_profile(user_index: int, store_games: list[dict],
+                                min_games: int, max_games: int,
+                                pt_low: int, pt_high: int, pt2_low: int, pt2_high: int) -> dict:
+                                    
+    game_count = random.randint(min_games, min(max_games, len(store_games)))
     chosen_games = random.sample(store_games, game_count)
-
-    games = []
-    for g in chosen_games:
-        games.append({
+    
+    games = [
+        {
             "appid": g["appid"],
             "name": g["name"],
-            "playtime_forever": generate_playtime_minutes(),
-            "playtime_2weeks": generate_playtime_2weeks(),
+            "playtime_forever": random.randint(pt_low, pt_high),
+            "playtime_2weeks": random.choice([0, random.randint(pt2_low, pt2_high)]),
             "genres": g["genres"],
             "categories": g["categories"],
-        })
-
-    return games
-
-
-def generate_fake_steam_profile(user_index: int, store_games: list[dict]) -> dict:
-    games = generate_fake_owned_games(store_games)
-
+        }
+        for g in chosen_games
+    ]
+    
     return {
-        "steam_id": f"fake_{user_index}",
+        "steam_id": f"{''.join(str(random.randint(1, 9)) for _ in range(17))}",
         "game_count": len(games),
         "games": games,
     }
-
 
 # ==========================================================
 # MAIN SEED FUNCTION
 # ==========================================================
 
-def seed_fake_accounts() -> None:
-    create_tables()
+def seed_fake_accounts(
+        num_users: int = NUM_USERS,
+        min_games_per_user: int = MIN_GAMES_PER_USER,
+        max_games_per_user: int = MAX_GAMES_PER_USER,
+        seed: int = SEED,
+        pt_low: int = PT_LOW,
+        pt_high: int = PT_HIGH,
+        pt2_low: int = PT2_LOW,
+        pt2_high: int = PT2_HIGH
+    ) -> None:
+    
+    random.seed(seed)
+    start = perf_counter()
+    print("Starting seed script...")
+
+    print("Setting up database\nCreating tables if not existing...")
+    create_tables(db_path=SETTINGS.db_path)
     conn = get_connection()
     user_db = UserDB(conn)
     snapshot_db = SnapshotDB(conn)
+
+    print("Loading Steam example games from json (RAM)...")
     store_games = load_store_games()
+    print(f"Loaded {len(store_games)} Steam store games from: {GAME_DATA_FILE}")
+
+    users_created = 0
+    snapshots_created = 0
+    failed_users = 0
+
+    print("Seeding fake users now...")
     
-    print(f"loaded {len(store_games)} Steam store games from: {GAME_DATA_FILE}")
+    # Begin by creating a user with "dev", "dev" credentials
+    try:
+        dev_steam_profile = generate_fake_steam_profile(1, store_games, min_games_per_user, max_games_per_user, pt_low, pt_high, pt2_low, pt2_high)
+        user_id = user_db.insert_user(email="dev", username="dev", steam_id=dev_steam_profile["steam_id"])
+        users_created += 1
+        extracted = extract_games(dev_steam_profile)
+        snapshot = create_snapshot(user_id=user_id, games=extracted)
+        snapshot_db.insert_snapshot(snapshot)
+        snapshots_created += 1
+        
+    except ValueError:
+        failed_users+=1
+        
+    # Proceed with remaining users
+    for i in range(2, num_users + 1):
+        bar = progress_bar(i, num_users, 20)
+        elapsed = perf_counter() - start
+        print(f"\r{bar} ({i}/{num_users}) ({elapsed:.2f}s elapsed)", end="", flush=True)
 
-    for i in range(1, NUM_USERS + 1):
-        print("-" * 50)
-        print(f"creating fake user {i} out of {NUM_USERS}")
-
-        # Fake SteamTeam credentials
         username = generate_fake_username(i)
-        email = f"fake_user{i}@fake.com"
+        email = f"{username}@fake.com"
+        steam_profile = generate_fake_steam_profile(
+            i, store_games, min_games_per_user, max_games_per_user,
+            pt_low, pt_high, pt2_low, pt2_high
+        )
 
-        print(f"username: {username}")
-        print(f"email: {email}")
-
-        # Fake Steam profile
-        steam_profile = generate_fake_steam_profile(i, store_games)
-
-        # --------------------------------------------
-        # DB: create user
-        # --------------------------------------------
-        
         try:
-            user_id = user_db.insert_user(
-                email=email,
-                username=username,
-                steam_id=steam_profile["steam_id"]
-            )
-            print(f"user saved to database with user_id: {user_id}")
-        
-        except ValueError as e:
-            print(f"error adding user: {e}")
-            print("skipping..")
+            user_id = user_db.insert_user(email=email, username=username, steam_id=steam_profile["steam_id"])
+            users_created += 1
+            
+        except ValueError:
+            failed_users += 1
             continue
 
-
-        # Create snapshot
-        print(f"creating snapshot...")
         extracted = extract_games(steam_profile)
         snapshot = create_snapshot(user_id=user_id, games=extracted)
-        print(f"snapshot created for user_id={snapshot.user_id}")
+        snapshot_db.insert_snapshot(snapshot)
+        snapshots_created += 1
 
-        # --------------------------------------------
-        # DB: save snapshot
-        # --------------------------------------------
-        
-        snapshot_id = snapshot_db.insert_snapshot(snapshot)
-        print(f"snapshot saved to database with id: {snapshot_id}")
-        
-        print("account created")
-    
     conn.close()
-    
-    print("-" * 50)
-    print("seeding complete!")
+    elapsed = perf_counter() - start
 
+    print("")
+    print(f"Users created     : {users_created}")
+    print(f"Snapshots created : {snapshots_created}")
+    print(f"Failed users      : {failed_users}")
+    print(f"Time elapsed      : {elapsed:.2f}s")
+    print("\nSeeding completed!")
 
 # ==========================================================
 # ENTRYPOINT
 # ==========================================================
 
 if __name__ == "__main__":
-    seed_fake_accounts()
+    print("You can press ENTER to select default values")
+    raw_users = input(f"Number of fake users to seed (default {NUM_USERS}) [int]: ").strip()
+    raw_min = input(f"Minimum games per user (default {MIN_GAMES_PER_USER}) [int]: ").strip()
+    raw_max = input(f"Maximum games per user (default {MAX_GAMES_PER_USER}) [int]: ").strip()
+    raw_seed = input(f"Random seed (default {SEED}) [int]: ").strip()
+    raw_pt_low = input(f"Playtime total low (default {PT_LOW}) [int]: ").strip()
+    raw_pt_high = input(f"Playtime total high (default {PT_HIGH}) [int]: ").strip()
+    raw_pt2_low = input(f"Playtime last 2 weeks low (default {PT2_LOW}) [int]: ").strip()
+    raw_pt2_high = input(f"Playtime last 2 weeks high (default {PT2_HIGH}) [int]: ").strip()
+
+    try:
+        num = NUM_USERS if not raw_users else int(raw_users)
+        min_games = MIN_GAMES_PER_USER if not raw_min else int(raw_min)
+        max_games = MAX_GAMES_PER_USER if not raw_max else int(raw_max)
+        seed = SEED if not raw_seed else int(raw_seed)
+        pt_low = PT_LOW if not raw_pt_low else int(raw_pt_low)
+        pt_high = PT_HIGH if not raw_pt_high else int(raw_pt_high)
+        pt2_low = PT2_LOW if not raw_pt2_low else int(raw_pt2_low)
+        pt2_high = PT2_HIGH if not raw_pt2_high else int(raw_pt2_high)
+
+    except ValueError:
+        raise ValueError("All inputs must be integers")
+
+    seed_fake_accounts(
+        num_users=num,
+        min_games_per_user=min_games,
+        max_games_per_user=max_games,
+        seed=seed,
+        pt_low=pt_low,
+        pt_high=pt_high,
+        pt2_low=pt2_low,
+        pt2_high=pt2_high
+    )

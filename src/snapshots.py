@@ -1,9 +1,9 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 import json
 
-from .vectors import build_game_vector, build_genre_vector
+from .vectors import build_game_vector, build_genre_vector, build_category_vector
 
 
 @dataclass
@@ -12,6 +12,8 @@ class Snapshot:
     created_at: datetime
     game_vector: dict[int, float]
     genre_vector: dict[str, float]
+    category_vector: dict[str, float]
+    top_games: list[dict] = field(default_factory=list)
 
     # Metod för att spara snapshot till en dict -> JSON/Databas
     def to_dict(self) -> dict:
@@ -21,6 +23,8 @@ class Snapshot:
             # JSON kräver str-keys, så vi gör det tydligt här
             "game_vector": {str(k): float(v) for k, v in self.game_vector.items()},
             "genre_vector": {str(k): float(v) for k, v in self.genre_vector.items()},
+            "category_vector": {str(k): float(v) for k, v in self.category_vector.items()},
+            "top_games": self.top_games,
         }
 
     # Metod för att läsa in en snapshot från JSON/Databas -> Pythonobjekt (appid-key: int)
@@ -31,6 +35,8 @@ class Snapshot:
             created_at=datetime.fromisoformat(data["created_at"]),
             game_vector={int(k): float(v) for k, v in data["game_vector"].items()},
             genre_vector={str(k): float(v) for k, v in data["genre_vector"].items()},
+            category_vector={str(k): float(v) for k, v in data["category_vector"].items()},
+            top_games=data.get("top_games", []),
         )
 
     # __str__ för att kunna printa snapshotten snyggt om man vill
@@ -43,36 +49,45 @@ class Snapshot:
         ]
 
         for appid, weight in self.game_vector.items():
-            lines.append(f"  {appid}: {round(weight * 100, 2)} %")
+            lines.append(f"  {appid}: {weight * 100:.2f} %")
 
         lines.append("")
         lines.append("Genre vector:")
 
         for genre, weight in self.genre_vector.items():
-            lines.append(f"  {genre}: {round(weight * 100, 2)} %")
+            lines.append(f"  {genre}: {weight * 100:.2f} %")
+
+        lines.append("")
+        lines.append("Category / playstyle vector:")
+
+        for category, weight in self.category_vector.items():
+            lines.append(f"  {category}: {weight * 100:.2f} %")
 
         return "\n".join(lines)
 
-# Bygger och returnerar ett Snapshot-objekt (user-id + vektorer + timestamp)
+# Bygger och returnerar ett Snapshot-objekt (user-id + vektorer + timestamp + top3 games)
 def create_snapshot(user_id: int, games: list[dict]) -> Snapshot:
-    if not games:
-        raise ValueError("No games provided")
-
     games_sorted = sorted(games, key=lambda g: g["playtime"], reverse=True)
 
     game_vector = build_game_vector(games_sorted)
     genre_vector = build_genre_vector(games_sorted, game_vector)
+    category_vector = build_category_vector(games_sorted, game_vector)
+
+    top_games = []
+    for g in games_sorted[:3]:
+        appid = g["appid"]
+        top_games.append({
+            "appid": appid,
+            "name": g["game"],
+            "playtime": g["playtime"],
+            "share": game_vector[appid],
+        })
 
     return Snapshot(
         user_id=user_id,
         created_at=datetime.now(),
         game_vector=game_vector,
         genre_vector=genre_vector,
+        category_vector=category_vector,
+        top_games=top_games,
     )
-
-
-# Hjälpfunktion för att läsa in en Snapshot från JSON (och få ett matchningsklart objekt)
-def load_snapshot_from_json(path: Path) -> Snapshot:
-    with path.open(encoding="utf-8") as f:
-        data = json.load(f)
-    return Snapshot.from_dict(data)

@@ -2,13 +2,11 @@ import sqlite3
 import json
 from pathlib import Path
 from datetime import datetime
-
+from data.settings import SETTINGS
 from src.snapshots import Snapshot
 
-
-BASE_DIR = Path(__file__).resolve().parents[1]  # repo root
-DB_PATH = BASE_DIR / "data" / "db" / "steamteam.sqlite3"
-
+# Full path to sqlite3 file
+DB_PATH = SETTINGS.db_path
 
 def get_connection(db_path: Path = DB_PATH) -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -17,11 +15,14 @@ def get_connection(db_path: Path = DB_PATH) -> sqlite3.Connection:
     return conn
 
 
-def create_tables(db_path: Path = DB_PATH) -> None:
-    conn = get_connection(db_path)
-    cur = conn.cursor()
+def create_tables_on_connection(conn: sqlite3.Connection) -> None:
+    """
+    Skapar tabeller på en redan öppen connection.
+    Skapad för pytest med :memory: eftersom databasen lever så länge conn lever.
+    """
+    conn.execute("PRAGMA foreign_keys = ON;")
 
-    cur.executescript(
+    conn.executescript(
         """
         CREATE TABLE IF NOT EXISTS users (
             user_id     INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,9 +50,19 @@ def create_tables(db_path: Path = DB_PATH) -> None:
         );
         """
     )
-
     conn.commit()
-    conn.close()
+
+
+def create_tables(db_path: Path) -> None:
+    """
+    Skapar tabeller i en filbaserad db (normal drift).
+    Öppnar conn -> skapar tabeller -> stänger conn.
+    """
+    conn = sqlite3.connect(db_path)
+    try:
+        create_tables_on_connection(conn)
+    finally:
+        conn.close()
 
 #Klass där funktioner för att prata med databasen bor
 class UserDB:
@@ -94,17 +105,18 @@ class UserDB:
         *,
         email: str | None = None,
         username: str | None = None,
+        user_id: int | None = None
     ) -> dict | None:
 
-        if email is None and username is None:
-            raise ValueError("Provide at least email or username")
+        if email is None and username is None and user_id is None:
+            raise ValueError("Provide at least email, username or user_id")
 
         query = """
         SELECT user_id, email, username, steam_id, created_at
         FROM users
         WHERE 1=1
         """
-        params: list[str] = []
+        params: list[object] = []
 
         #För att funktionen ska funka med email, ELLER usernamn, ELLER båda två!
         if email is not None:
@@ -114,6 +126,10 @@ class UserDB:
         if username is not None:
             query += " AND username = ?"
             params.append(username)
+
+        if user_id is not None:
+            query += " AND user_id = ?"
+            params.append(user_id)
 
         cur = self.conn.execute(query, tuple(params))
         row = cur.fetchone()
