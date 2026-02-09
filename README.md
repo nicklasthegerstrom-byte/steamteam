@@ -114,52 +114,53 @@ python scripts/seed_fake_accounts.py
 ---
 
 ## 🚀 Running the application
-
+Clone repository and create virtual environment:  
+```
 git clone https://github.com/nicklasthegerstrom-byte/steamteam.git
 cd steamteam
 python -m venv venv
-
+```
 Activate venv:
 
-Windows:
-venv\Scripts\activate
+Windows:  
+`venv\Scripts\activate`
 
-MacOS / Linux:
-source venv/bin/activate
+MacOS / Linux:  
+`source venv/bin/activate`
 
-Install dependencies:
-pip install -r requirements.txt
+Install dependencies:  
+`pip install -r requirements.txt`
 
-(Optional) Add Steam API key in .env:
-STEAM_API_KEY=your_api_key_here
+(Optional) Add Steam API key in .env:  
+`STEAM_API_KEY=your_api_key_here`
 
-Run the app:
-python app.pyw
+Run the app:  
+`python app.pyw`
 
 ---
 
 ## 👥 Contributors & Responsibilities
 
-Constantine:
+Constantine - [AeolianOpus](https://github.com/AeolianOpus):
 - Project structure
 - Settings
 - Models (core classes)
 - Logger
 
-Even:
+Even - [evenhadeghe](https://github.com/evenhadeghe):
 - Graphical user interface
 
-Nick:
+Nick - [nicklasthegerstrom-byte](https://github.com/nicklasthegerstrom-byte):
 - Vector logic
 - Database setup and functions
 - Matchcard / Selfcard (Snapshot vizualisation)
 
-Erik:
+Erik - [ErikCoderMan](https://github.com/ErikCoderMan):
 - Steam API functions
 - seed_fake_accounts script
 - Master testing
 
-Adam:
+Adam - [adamwelday](https://github.com/adamwelday):
 - Matching logic and similarity algorithms
 
 ---
