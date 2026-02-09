@@ -1,10 +1,53 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import List, Tuple
+
 from src.db import get_connection, UserDB, SnapshotDB
 from src.snapshots import create_snapshot, Snapshot
 from api.steam_webapi import resolve_steam_id, fetch_owned_games
-from src.vectors import extract_games
+from src.vectors import extract_games, summarize_playstyle
 from data.store_cache import get_game
+from services.logger import get_logger
 
-__all__ = ["sync_user_profile"]
+__all__ = ["sync_user_profile", "SelfCard", "build_self_card"]
+
+log = get_logger(__name__)
+
+
+# ------------------ View profile info ------------------
+
+@dataclass(slots=True)
+class SelfCard:
+    username: str
+    steam_id: str | None
+    playstyles: dict[str, float]
+    top_genres: List[Tuple[str, float]]
+    top_games: List[Tuple[str, int]] 
+
+
+def build_self_card(snapshot: Snapshot, username: str, steam_id: str | None) -> SelfCard:
+    playstyles = summarize_playstyle(snapshot.category_vector)
+
+    top_genres = sorted(
+        snapshot.genre_vector.items(),
+        key=lambda x: x[1],
+        reverse=True
+    )[:3]
+
+    top_games = [
+        (g["name"], round(g["playtime"] / 60))
+        for g in (snapshot.top_games or [])[:3]
+    ]
+
+    return SelfCard(
+        username=username,
+        steam_id=steam_id,
+        playstyles=playstyles,
+        top_genres=top_genres,
+        top_games=top_games,
+    )
+
 
 # ------------------ Internal helpers ------------------
 
@@ -13,7 +56,12 @@ def enrich_games(games: list[dict], top_n: int = 5) -> list[dict]:
     Sort games by playtime and enrich each with Steam Store metadata (genres, categories).
     Returns a list of enriched game dicts.
     """
-    sorted_games = sorted(games, key=lambda g: g.get("playtime_forever", 0), reverse=True)[:top_n]
+    sorted_games = sorted(
+        games,
+        key=lambda g: g.get("playtime_forever", 0),
+        reverse=True
+    )[:top_n]
+
     enriched: list[dict] = []
 
     for g in sorted_games:
@@ -21,7 +69,6 @@ def enrich_games(games: list[dict], top_n: int = 5) -> list[dict]:
         game_data = get_game(appid)
 
         if not game_data:
-            # fallback if fetch failed
             enriched.append({
                 "appid": appid,
                 "name": "unknown",
@@ -43,45 +90,87 @@ def enrich_games(games: list[dict], top_n: int = 5) -> list[dict]:
 
     return enriched
 
+
 # ------------------ Public function ------------------
 
-def sync_user_profile(user_id: int, top_n: int = 5) -> Snapshot:
+def sync_user_profile(user_id: int, top_n: int = 5) -> tuple[Snapshot, SelfCard]:
     """
     Full profile sync:
-    1. Resolve SteamID
-    2. Fetch owned games
-    3. Enrich games with store metadata
-    4. Create snapshot
-    5. Save snapshot to DB
-    6. Return snapshot
+    1. Fetch user from DB
+    2. Resolve SteamID
+    3. Fetch owned games
+    4. Enrich games with store metadata
+    5. Create snapshot
+    6. Save snapshot to DB
+    7. Build selfcard
+    8. Return snapshot + selfcard
     """
-    conn = get_connection()
-    user_db = UserDB(conn)
-    user = user_db.get_user(user_id=user_id)
-    steam_id = user.get("steam_id")
-    conn.close()
-    
-    steam_id: str = resolve_steam_id(steam_id)
-    games: list[dict] = fetch_owned_games(steam_id)
-    enriched_games: list[dict] = enrich_games(games, top_n)
+    log.info("Profile sync started user_id=%s top_n=%s", user_id, top_n)
 
-    steam_dict: dict = {
-        "steam_id": steam_id,
-        "game_count": len(enriched_games),
-        "games": enriched_games
-    }
+    try:
+        #  Fetch user from DB
+        with get_connection() as conn:
+            user_db = UserDB(conn)
+            user = user_db.get_user(user_id=user_id)
 
-    extracted: dict = extract_games(steam_dict)
-    snapshot: Snapshot = create_snapshot(user_id, extracted)
+        if not user:
+            log.error("User not found user_id=%s", user_id)
+            raise ValueError(f"User {user_id} not found")
 
-    conn = get_connection()
-    snapshot_db = SnapshotDB(conn)
-    snapshot_id: int = snapshot_db.insert_snapshot(snapshot)
-    conn.close()
+        steam_id = user.get("steam_id")
+        username = user.get("username") or "Unknown"
 
-    print(f"user profile: {user_id} synced with snapshot_id: {snapshot_id}")
-    return snapshot
+        if not isinstance(steam_id, str) or not steam_id.strip():
+            log.error("User missing steam_id user_id=%s", user_id)
+            raise ValueError(f"User {user_id} has no steam_id")
 
+        steam_id = resolve_steam_id(steam_id)
+
+        # Fetch owned games
+        games = fetch_owned_games(steam_id)
+        log.info(
+            "Owned games fetched user_id=%s steam_id=%s count=%d",
+            user_id,
+            steam_id,
+            len(games),
+        )
+
+        # Enrich games
+        enriched_games = enrich_games(games, top_n)
+
+        steam_dict = {
+            "steam_id": steam_id,
+            "game_count": len(enriched_games),
+            "games": enriched_games,
+        }
+
+        # Create snapshot
+        extracted = extract_games(steam_dict)
+        snapshot = create_snapshot(user_id, extracted)
+
+        # Save snapshot
+        with get_connection() as conn:
+            snapshot_db = SnapshotDB(conn)
+            snapshot_id = snapshot_db.insert_snapshot(snapshot)
+
+        log.info("Profile sync complete user_id=%s snapshot_id=%s", user_id, snapshot_id)
+
+        # Build selfcard
+        selfcard = build_self_card(
+            snapshot,
+            username=username,
+            steam_id=steam_id,
+        )
+
+        return snapshot, selfcard
+
+    except ValueError:
+        log.warning("Profile sync validation issue user_id=%s", user_id)
+        raise
+
+    except Exception:
+        log.exception("Profile sync failed user_id=%s", user_id)
+        raise
 # ------------------ Manual testing ------------------
 
 if __name__ == "__main__":
@@ -101,7 +190,7 @@ if __name__ == "__main__":
         exit(1)
 
     print(f"\nSyncing profile for user_id={user_id_input}, top_n={top_n_input}...\n")
-    snapshot = sync_user_profile(user_id_input, top_n_input)
+    snapshot, selfcard = sync_user_profile(user_id_input, top_n_input)
 
     print("\n=== Snapshot object ===")
     print(snapshot)

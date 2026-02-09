@@ -4,18 +4,22 @@ from pathlib import Path
 from datetime import datetime
 from data.settings import SETTINGS
 from src.snapshots import Snapshot
+from services.logger import get_logger
 
 # Full path to sqlite3 file
 DB_PATH = SETTINGS.db_path
+log = get_logger(__name__)
 
 def get_connection(db_path: Path = DB_PATH) -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
+    log.debug("Opening database connection path=%s", db_path)
     conn = sqlite3.connect(db_path)
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn
 
 
 def create_tables_on_connection(conn: sqlite3.Connection) -> None:
+    log.debug("Ensuring database tables exist")
     """
     Skapar tabeller på en redan öppen connection.
     Skapad för pytest med :memory: eftersom databasen lever så länge conn lever.
@@ -54,6 +58,7 @@ def create_tables_on_connection(conn: sqlite3.Connection) -> None:
 
 
 def create_tables(db_path: Path) -> None:
+    log.debug("Creating tables path=%s", db_path) 
     """
     Skapar tabeller i en filbaserad db (normal drift).
     Öppnar conn -> skapar tabeller -> stänger conn.
@@ -61,6 +66,10 @@ def create_tables(db_path: Path) -> None:
     conn = sqlite3.connect(db_path)
     try:
         create_tables_on_connection(conn)
+        log.info("Database tables ensured path=%s", db_path)
+    except Exception:
+        log.exception("Error creating database tables path=%s", db_path)
+        raise
     finally:
         conn.close()
 
@@ -85,21 +94,26 @@ class UserDB:
             )
             self.conn.commit()
 
-            user_id = int(cur.lastrowid)
-            #returnerar ett user_id (int)
+            last_id = cur.lastrowid
+            if last_id is None:
+                raise RuntimeError("Insert succeeded but no lastrowid was returned")
+
+            user_id = int(last_id)
+            log.info("User inserted user_id=%s username=%s", user_id, username)
             return user_id
 
         except sqlite3.IntegrityError as e:
+            log.warning("User insert constraint violation username=%s email=%s", username, email)
             msg = str(e).lower()
-            if "users.email" in msg:
+            if "users.email" in msg or "email" in msg:
                 raise ValueError("Email already exists") from e
-            if "users.username" in msg:
+            if "users.username" in msg or "username" in msg:
                 raise ValueError("Username already exists") from e
-            if "users.steam_id" in msg:
+            if "users.steam_id" in msg or "steam_id" in msg:
                 raise ValueError("Steam ID already exists") from e
             raise ValueError("User violates database constraints") from e
 
-    #Funktion för att hämta användardata med EMAIL och/eller USERNAME.
+    # Funktion för att hämta användardata med EMAIL och/eller USERNAME och/eller USER_ID.
     def get_user(
         self,
         *,
@@ -118,7 +132,7 @@ class UserDB:
         """
         params: list[object] = []
 
-        #För att funktionen ska funka med email, ELLER usernamn, ELLER båda två!
+        # För att funktionen ska funka med email, ELLER username, ELLER user_id, ELLER kombination.
         if email is not None:
             query += " AND email = ?"
             params.append(email)
@@ -145,6 +159,75 @@ class UserDB:
             "created_at": row[4],
         }
 
+    def update_email(self, user_id: int, new_email: str) -> None:
+        try:
+            cur = self.conn.execute(
+                """
+                UPDATE users
+                SET email = ?
+                WHERE user_id = ?
+                """,
+                (new_email, user_id),
+            )
+            self.conn.commit()
+
+            if cur.rowcount == 0:
+                raise ValueError(f"User {user_id} not found")
+
+            log.info("User email updated user_id=%s", user_id)
+
+        except sqlite3.IntegrityError as e:
+            msg = str(e).lower()
+            if "users.email" in msg or "email" in msg:
+                raise ValueError("Email already exists") from e
+            raise ValueError("Email violates database constraints") from e
+
+    def update_username(self, user_id: int, new_username: str) -> None:
+        try:
+            cur = self.conn.execute(
+                """
+                UPDATE users
+                SET username = ?
+                WHERE user_id = ?
+                """,
+                (new_username, user_id),
+            )
+            self.conn.commit()
+
+            if cur.rowcount == 0:
+                raise ValueError(f"User {user_id} not found")
+
+            log.info("Username updated user_id=%s", user_id)
+
+        except sqlite3.IntegrityError as e:
+            msg = str(e).lower()
+            if "users.username" in msg or "username" in msg:
+                raise ValueError("Username already exists") from e
+            raise ValueError("Username violates database constraints") from e
+
+    def update_steam_id(self, user_id: int, new_steam_id: str) -> None:
+        try:
+            cur = self.conn.execute(
+                """
+                UPDATE users
+                SET steam_id = ?
+                WHERE user_id = ?
+                """,
+                (new_steam_id, user_id),
+            )
+            self.conn.commit()
+
+            if cur.rowcount == 0:
+                raise ValueError(f"User {user_id} not found")
+
+            log.info("Steam ID updated user_id=%s", user_id)
+
+        except sqlite3.IntegrityError as e:
+            msg = str(e).lower()
+            if "users.steam_id" in msg or "steam_id" in msg:
+                raise ValueError("Steam ID already exists") from e
+            raise ValueError("Steam ID violates database constraints") from e
+
     #Förslag? update_user_steam_id(user_id: int)
 
 #Klass med funktioner för snapshotfunktioner
@@ -166,8 +249,14 @@ class SnapshotDB:
         self.conn.commit()
 
         #returnerar ett snapshot_id (int)
-        snapshot_id = int(cur.lastrowid)
+        last_id = cur.lastrowid
+        if last_id is None:
+            raise RuntimeError("Insert snapshot succeeded but no lastrowid was returned")
+
+        snapshot_id = int(last_id)
+        log.info("Snapshot inserted user_id=%s snapshot_id=%s", snapshot.user_id, snapshot_id)
         return snapshot_id
+
 
     def load_latest_snapshot(self, user_id: int) -> Snapshot | None:
         cur = self.conn.execute(
@@ -258,9 +347,10 @@ class GameCache:
                 datetime.now().isoformat()
             )
         )
-        self.conn.commit()    
+        self.conn.commit()
+        log.debug("Game cached appid=%s name=%s", appid, name)    
 
 
 if __name__ == "__main__":
-    create_tables()
+    create_tables(DB_PATH)
     print(f"✅ Database ready at {DB_PATH.resolve()}")

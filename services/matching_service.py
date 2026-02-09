@@ -4,6 +4,9 @@ from src.snapshots import Snapshot
 from dataclasses import dataclass
 from typing import List, Tuple
 from src.vectors import summarize_playstyle
+from services.logger import get_logger
+
+log = get_logger(__name__)
 
 
 #Matchcard för trevlig presentation av matchningarna
@@ -72,26 +75,34 @@ def match_snapshot_to_all(target_snapshot: Snapshot, top_n: int = 5) -> list[Mat
     Match a single snapshot against all other snapshots in the DB.
     Returns a list of MatchCard objects.
     """
-    conn = get_connection()
-    snapshot_db = SnapshotDB(conn)
-    all_snapshots = snapshot_db.load_all_latest_snapshots()
-    conn.close()
+    log.info("Matching started target_user_id=%s top_n=%s", target_snapshot.user_id, top_n)
 
-    # Adapter: Snapshot -> vectors (INGET räknas om)
-    other_users_vectors = {
-        s.user_id: snapshot_to_vectors(s)
-        for s in all_snapshots
-        if s.user_id != target_snapshot.user_id
-    }
+    try:
+        conn = get_connection()
+        snapshot_db = SnapshotDB(conn)
+        all_snapshots = snapshot_db.load_all_latest_snapshots()
+        log.debug("Matching pool size=%d", len(all_snapshots))
+        conn.close()
 
-    target_vectors = snapshot_to_vectors(target_snapshot)
+        # Adapter: Snapshot -> vectors (INGET räknas om)
+        other_users_vectors = {
+            s.user_id: snapshot_to_vectors(s)
+            for s in all_snapshots
+            if s.user_id != target_snapshot.user_id
+        }
 
-    matches = find_best_matches(
-        target_user_id=target_snapshot.user_id,
-        target_vectors=target_vectors,
-        other_users=other_users_vectors,
-        top_n=top_n,
-    )
+        target_vectors = snapshot_to_vectors(target_snapshot)
+
+        matches = find_best_matches(
+            target_user_id=target_snapshot.user_id,
+            target_vectors=target_vectors,
+            other_users=other_users_vectors,
+            top_n=top_n,
+        )
+
+    except Exception:
+        log.exception("Matching failed target_user_id=%s", target_snapshot.user_id)
+        raise
 
     conn = get_connection()
     user_db = UserDB(conn)
@@ -118,9 +129,11 @@ def match_snapshot_to_all(target_snapshot: Snapshot, top_n: int = 5) -> list[Mat
     finally:
         conn.close()
 
+    log.info("Matching complete target_user_id=%s results=%d", target_snapshot.user_id, len(match_cards))
     return match_cards
 
-def match_user_id(user_id: int, top_n: int = 5) -> list[dict]:
+
+def match_user_id(user_id: int, top_n: int = 5) -> list[MatchCard]:
     """
     Fetch a snapshot by user_id and match it against all other users.
     """
