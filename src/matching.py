@@ -32,9 +32,9 @@ def match_users(
     user_b_category_vector: Dict[str, float],
     user_a_game_vector: Dict[int, float],
     user_b_game_vector: Dict[int, float],
-    genre_weight: float = 0.5,
+    genre_weight: float = 0.2,
     category_weight: float = 0.3,
-    game_weight: float = 0.2
+    game_weight: float = 0.5
 ) -> float:
     """
     Matchar två users baserat på deras vectors
