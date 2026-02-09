@@ -15,17 +15,7 @@ class MatchView:
 
         controls = ttk.Frame(self.frame, style="Card.TFrame")
         controls.pack(fill="x", padx=18, pady=(0, 12))
-
-        ttk.Label(controls, text="Mode", style="CardText.TLabel").pack(side="left", padx=(0, 10))
-
-        self.mode_var = tk.StringVar(value="Games")
-        ttk.Combobox(
-            controls,
-            textvariable=self.mode_var,
-            values=["Games", "Genres", "Playstyle"],
-            state="readonly",
-            width=14,
-        ).pack(side="left", padx=(0, 12))
+        
 
         # MainWindow kopplar command senare via set_on_find
         self.find_btn = ttk.Button(controls, text="Find teammates")
