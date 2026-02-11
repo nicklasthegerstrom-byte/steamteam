@@ -2,6 +2,10 @@
 
 Find your dream team (on Steam).
 
+## 🎬 Demo Video
+
+[![Watch the demo](assets/demo_thumbnail.png)](https://vimeo.com/1164053298)
+
 ---
 
 ## 🎮 What is Steamteam?
@@ -113,6 +117,26 @@ python scripts/seed_fake_accounts.py
 - Vector similarity algorithms
 - SQLite database persistence
 - Graphical user interface (Tkinter)
+- Command line interface (CLI)
+
+
+---
+
+## 🧪 Running tests
+
+The project uses **PyTest** for automated testing.
+
+From the project root (with venv activated):
+
+```
+pytest
+```
+
+## 🤖 CI/CD
+
+SteamTeam uses **GitHub Actions** to automatically run the full test suite on every push and pull request into dev or main branch.
+
+Full program circle and functions is tested, included creating database, matching users etc.
 
 ---
 
@@ -164,6 +188,7 @@ Run the command-line version:
 The CLI lets you log in/register, sync your Steam profile, and find matches directly in the terminal.
 
 ---
+
 
 ## 👥 Contributors & Responsibilities
 
