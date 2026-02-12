@@ -59,16 +59,6 @@ def build_match_card(
         top_games=top_games,
     )
 
-def snapshot_to_vectors(snapshot: Snapshot) -> dict:
-    """
-    Converts a Snapshot object to the dict format expected by find_best_matches
-    """
-    return {
-        "genre_vector": snapshot.genre_vector,
-        "category_vector": snapshot.category_vector,
-        "game_vector": snapshot.game_vector,
-    }
-
 
 def match_snapshot_to_all(target_snapshot: Snapshot, top_n: int = 5) -> list[MatchCard]:
     """
@@ -85,18 +75,16 @@ def match_snapshot_to_all(target_snapshot: Snapshot, top_n: int = 5) -> list[Mat
         conn.close()
 
         # Adapter: Snapshot -> vectors (INGET räknas om)
-        other_users_vectors = {
-            s.user_id: snapshot_to_vectors(s)
+        other_users_snapshots = {
+            s.user_id: s
             for s in all_snapshots
             if s.user_id != target_snapshot.user_id
         }
 
-        target_vectors = snapshot_to_vectors(target_snapshot)
-
         matches = find_best_matches(
             target_user_id=target_snapshot.user_id,
-            target_vectors=target_vectors,
-            other_users=other_users_vectors,
+            target_snapshot=target_snapshot,
+            other_users=other_users_snapshots,
             top_n=top_n,
         )
 
