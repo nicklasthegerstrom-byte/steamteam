@@ -22,37 +22,33 @@ def cosine_similarity_dict(v1: Dict, v2: Dict) -> float:
 
 
 # ==================================================
-# Match two users
+# Match two users (snapshot-version)
 # ==================================================
 
 def match_users(
-    user_a_genre_vector: Dict[str, float],
-    user_b_genre_vector: Dict[str, float],
-    user_a_category_vector: Dict[str, float],
-    user_b_category_vector: Dict[str, float],
-    user_a_game_vector: Dict[int, float],
-    user_b_game_vector: Dict[int, float],
+    snapshot_a: Dict,
+    snapshot_b: Dict,
     genre_weight: float = 0.2,
     category_weight: float = 0.3,
     game_weight: float = 0.5
 ) -> float:
     """
-    Matchar två users baserat på deras vectors
+    Matchar två users baserat på deras snapshots
     """
 
     genre_score = cosine_similarity_dict(
-        user_a_genre_vector,
-        user_b_genre_vector
+        snapshot_a.get("genre_vector", {}),
+        snapshot_b.get("genre_vector", {})
     )
 
     category_score = cosine_similarity_dict(
-        user_a_category_vector,
-        user_b_category_vector
+        snapshot_a.get("category_vector", {}),
+        snapshot_b.get("category_vector", {})
     )
 
     game_score = cosine_similarity_dict(
-        user_a_game_vector,
-        user_b_game_vector
+        snapshot_a.get("game_vector", {}),
+        snapshot_b.get("game_vector", {})
     )
 
     return (
@@ -63,12 +59,12 @@ def match_users(
 
 
 # ==================================================
-# Match one user vs many
+# Match one user vs many (snapshot-version)
 # ==================================================
 
 def find_best_matches(
     target_user_id: int,
-    target_vectors: Dict,
+    target_snapshot: Dict,
     other_users: Dict[int, Dict],
     top_n: int = 5
 ) -> List[Tuple[int, float]]:
@@ -78,17 +74,13 @@ def find_best_matches(
 
     matches: List[Tuple[int, float]] = []
 
-    for user_id, vectors in other_users.items():
+    for user_id, snapshot in other_users.items():
         if user_id == target_user_id:
             continue
 
         score = match_users(
-            target_vectors["genre_vector"],
-            vectors["genre_vector"],
-            target_vectors["category_vector"],
-            vectors["category_vector"],
-            target_vectors["game_vector"],
-            vectors["game_vector"],
+            target_snapshot,
+            snapshot
         )
 
         matches.append((user_id, score))
