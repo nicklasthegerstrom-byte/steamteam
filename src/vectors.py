@@ -1,6 +1,11 @@
 # vectors.py
 
-# Städa Json för att plocka ut nödvändig data till vector
+from services.logger import get_logger
+
+log = get_logger(__name__)
+
+
+#  Städa Json för att plocka ut nödvändig data till vector
 def extract_games(steam_json: dict) -> list[dict]:
     games: list[dict] = []
 
@@ -38,7 +43,7 @@ def build_game_vector(games: list[dict]) -> dict[int, float]:
 
     # Byt detta till logger sen för att varna för osäker vector
     if total < MIN_TOTAL_PLAYTIME:
-        print("Low playtime - results may be unreliable")
+        log.warning("Unstable vector built on total playtime %s minutes", total)
 
     # Returnerar en vector som dict
     return {g["appid"]: g["playtime"] / total for g in games}
